@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 交付一个高级、可托管的桌面 Web MVP：用户可搜索内置曲目，选择钢琴后用普通 QWERTY 键盘逐音演奏；当前句与下一句按 KTV 方式显示，按对播放歌曲旋律音，按错播放默认键音、标红并直接推进，结束后生成唱片封套式纪念卡。
+**Goal:** 交付一个高级、可托管的桌面 Web MVP：用户可搜索内置曲目，选择钢琴后用普通 QWERTY 键盘逐音演奏；当前句与下一句按 KTV 方式显示，按对播放歌曲旋律音并推进，按错播放默认键音、标红但留在当前音，用户可在目标之间自由即兴，结束后生成唱片封套式纪念卡。
 
 **Architecture:** React 负责首页、演奏页和完成页；纯 TypeScript 领域模块负责曲包、物理键映射和演奏状态机，UI 不自行决定音高或推进规则。Tone.js `Sampler` 负责浏览器音频并从本地 Salamander Grand Piano 子集加载采样；通过 `PianoPort` 接口隔离音频实现，使状态机和组件测试不依赖真实声卡。第一阶段只使用内置、人工校验的曲包；后续搜索服务、上传处理和个人曲库通过稳定的 `SongCatalog`/`SongPackage` 边界接入。
 
@@ -14,7 +14,7 @@
 - 手机端小于 `768px` 时不捕获演奏键，只保留搜歌与曲库信息，并显示“演奏需要实体电脑键盘”。
 - 不依赖 ROG 灯光、驱动、扩展或桌面客户端。
 - 不按键时不得发出钢琴声，也不得自动推进曲目。
-- 每次非重复的可演奏键 `keydown` 只消费一个事件；按错同样消费事件且无需重按。
+- 每次非重复的正确目标键 `keydown` 只消费一个事件；其他可演奏键只发默认音和反馈，不推进歌曲，目标键持续等待。
 - 使用 `KeyboardEvent.code`，不使用受输入法、Shift 或大小写影响的 `key`。
 - `Escape`、`F1`–`F12`、`Tab`、`CapsLock`、`Enter`、`Backspace`、`Control`、`Alt`、`Meta` 不作为目标键；屏幕键盘将冲突键置灰。
 - 演奏区固定展示当前句与下一句；当前字、目标键、下一句和完整屏幕键盘在 `1366×768` 无需页面滚动即可同时看见。
@@ -22,6 +22,7 @@
 - 错误使用红色、`×`、轮廓和文字共同表达；不播放额外蜂鸣或惩罚音，按错键的默认钢琴音就是错误听觉反馈。
 - 动效尊重 `prefers-reduced-motion`。
 - 采样使用 Alexander Holm 的 Salamander Grand Piano V3（CC BY 3.0），在应用关于/鸣谢区域保留作者与许可归属。
+- MotionSites 只作为已授权提示词的设计输入；不把它作为运行时依赖，不热链其演示媒体，也不复制未解锁的付费提示词。若后续接入 MotionSites MCP，只用于检索提示词并继续接受本规格与测试约束。
 
 ---
 
@@ -136,7 +137,7 @@ it('排除浏览器冲突键但保留字母、数字和空格', () => {
   expect(isPlayableCode('Tab')).toBe(false)
 })
 
-it('正确键播放歌曲音并推进；错误键播放默认音、记录错误并推进', () => {
+it('正确键播放歌曲音并推进；错误键播放默认音、记录错误但留在当前事件', () => {
   const song = builtinSongs[0]
   const started = startPlayer(createPlayerState(song))
   const correct = pressKey(started, song, song.events[0].targetCode)
@@ -146,7 +147,7 @@ it('正确键播放歌曲音并推进；错误键播放默认音、记录错误�
   const wrongCode = song.events[1].targetCode === 'KeyZ' ? 'KeyX' : 'KeyZ'
   const wrong = pressKey(correct.state, song, wrongCode)
   expect(wrong.sound).toMatchObject({ note: defaultNoteFor(wrongCode), kind: 'wrong' })
-  expect(wrong.state.eventIndex).toBe(2)
+  expect(wrong.state.eventIndex).toBe(1)
   expect(wrong.state.mistakes).toHaveLength(1)
 })
 ```
@@ -159,7 +160,7 @@ Expected: FAIL，提示键盘或状态机导出不存在。
 
 - [ ] **Step 3: 实现显式键位表和纯函数状态机**
 
-键位白名单只包含 `Backquote`、`Digit0`–`Digit9`、`Minus`、`Equal`、`KeyA`–`KeyZ`、`BracketLeft`、`BracketRight`、`Backslash`、`Semicolon`、`Quote`、`Comma`、`Period`、`Slash`、`Space`。默认音映射覆盖 `C3`–`C6`；屏幕布局额外包含一行 `Escape/F1–F12`，但标记 `disabled: true`。状态机在 `status !== 'playing'`、不可演奏键或已完成时不消费事件；最后一个事件消费后状态变为 `complete`；错误记录 `{ eventIndex, token, pressedCode, expectedCode }`。
+键位白名单只包含 `Backquote`、`Digit0`–`Digit9`、`Minus`、`Equal`、`KeyA`–`KeyZ`、`BracketLeft`、`BracketRight`、`Backslash`、`Semicolon`、`Quote`、`Comma`、`Period`、`Slash`、`Space`。默认音映射覆盖 `C3`–`C6`；屏幕布局额外包含一行 `Escape/F1–F12`，但标记 `disabled: true`。状态机在 `status !== 'playing'`、不可演奏键或已完成时不消费事件；只有 `code === currentEvent.targetCode` 才推进，最后一个正确目标键后状态变为 `complete`；错误记录 `{ eventIndex, token, pressedCode, expectedCode }`，但 `eventIndex` 保持不变。
 
 - [ ] **Step 4: 补齐长按由 UI 过滤、暂停、重来和回句测试**
 
@@ -334,13 +335,13 @@ it('同时显示当前句和下一句，并标记当前字与目标键', () => {
 - [ ] **Step 2: 写正确、错误、长按和暂停的交互失败测试**
 
 ```tsx
-it('按错标红但直接显示下一目标；重复 keydown 不再次推进', () => {
+it('按错标红但保持当前目标；重复 keydown 不推进', () => {
   render(<PlayerShell song={builtinSongs[0]} piano={fakePiano} onComplete={vi.fn()} onExit={vi.fn()} />)
   fireEvent.keyDown(window, { code: 'KeyZ', repeat: false })
   expect(screen.getByTestId('key-KeyZ')).toHaveAttribute('data-state', 'wrong')
-  expect(screen.getByText(/下一个/)).toBeVisible()
+  expect(screen.getByTestId('key-KeyN')).toHaveAttribute('data-state', 'target')
   fireEvent.keyDown(window, { code: 'KeyZ', repeat: true })
-  expect(screen.getByTestId('progress')).toHaveTextContent('1 /')
+  expect(screen.getByTestId('progress')).toHaveTextContent('0 /')
 })
 ```
 
@@ -354,7 +355,7 @@ it('按错标红但直接显示下一目标；重复 keydown 不再次推进', (
 
 - [ ] **Step 5: 实现换句、回句、重来与反馈计时**
 
-反馈状态保持约 `220ms`，但状态机立即推进；换句使用 `260ms` 淡入淡出且不阻塞按键。顶部操作仅保留暂停/继续、回到本句、重新开始和返回曲库。最后一个事件消费后调用 `onComplete(finalState)`。
+反馈状态保持约 `220ms`；正确反馈出现时状态机立即推进，错误反馈消失后仍回到同一目标。换句使用 `260ms` 淡入淡出且不阻塞按键。顶部操作仅保留暂停/继续、回到本句、重新开始和返回曲库。最后一个正确目标事件消费后调用 `onComplete(finalState)`。
 
 - [ ] **Step 6: 运行组件和领域回归测试并提交**
 
@@ -402,15 +403,28 @@ it('显示歌曲、日期、正确和错误数，但没有失败措辞', () => {
 - [ ] **Step 3: 添加端到端闭环测试**
 
 ```ts
-test('搜歌后正确和错误按键都推进，并完成演奏', async ({ page }) => {
+import { expect, test } from '@playwright/test'
+import { builtinSongs } from '../src/domain/songs'
+
+const codeToKeyboardKey = (code: string) => {
+  if (code === 'Space') return ' '
+  if (code.startsWith('Key')) return code.slice(3).toLowerCase()
+  if (code.startsWith('Digit')) return code.slice(5)
+  const symbols: Record<string, string> = { Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/' }
+  return symbols[code]
+}
+
+test('错误键不推进，随后逐个正确目标键完成演奏', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('searchbox', { name: '搜索歌曲' }).fill('你好，月光')
   await page.getByRole('button', { name: '演奏 你好，月光' }).click()
   await page.getByRole('button', { name: '进入演奏' }).click()
   await page.keyboard.press('z')
   await expect(page.getByTestId('key-KeyZ')).toHaveAttribute('data-state', 'wrong')
-  const remaining = await page.getByTestId('progress').getAttribute('data-remaining')
-  for (let index = 0; index < Number(remaining); index += 1) await page.keyboard.press('n')
+  await expect(page.getByTestId('progress')).toHaveTextContent('0 /')
+  for (const event of builtinSongs.find(song => song.title === '你好，月光')!.events) {
+    await page.keyboard.press(codeToKeyboardKey(event.targetCode))
+  }
   await expect(page.getByRole('heading', { name: '今晚的演奏，留在这里' })).toBeVisible()
 })
 ```
@@ -440,7 +454,7 @@ git commit -m "feat: complete moonlit piano web MVP"
 
 ## Plan Self-Review
 
-- 规格覆盖：搜歌、双层键位、错误推进、长按过滤、暂停、KTV 当前/下一句、冲突键、真实采样、完成卡、手机降级和视觉方向均有对应任务。
+- 规格覆盖：搜歌、双层键位、错误键即兴但不推进、长按过滤、暂停、KTV 当前/下一句、冲突键、真实采样、完成卡、手机降级和视觉方向均有对应任务。
 - 范围隔离：任意音视频识别、服务端搜索、个人账号与四套真实钢琴采样不混入第一阶段；现有接口允许后续接入。
 - 类型一致：所有组件与状态机只依赖 `SongPackage`、`PlayerState`、`PianoPort` 三个稳定边界。
 - 无占位符：每项任务都包含明确文件、接口、失败测试、实现规则、验证命令和提交点。
