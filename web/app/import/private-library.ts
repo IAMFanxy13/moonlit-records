@@ -39,7 +39,7 @@ export function createMemoryPrivateLibrary(initial: unknown[] = []): PrivateLibr
     },
     async put(record) {
       const existing = [...records.values()].find((item) => item.checksum === record.checksum);
-      if (existing) return structuredClone(existing);
+      if (existing && existing.id !== record.id) records.delete(existing.id);
       records.set(record.id, structuredClone(record));
       return structuredClone(record);
     },
@@ -105,9 +105,10 @@ export function createIndexedDbPrivateLibrary(): PrivateLibrary {
       try {
         const readTransaction = database.transaction(STORE_NAME);
         const existing = await requestResult(readTransaction.objectStore(STORE_NAME).index("checksum").get(record.checksum));
-        if (isPrivateSongRecord(existing)) return existing;
         const transaction = database.transaction(STORE_NAME, "readwrite");
-        transaction.objectStore(STORE_NAME).put(record);
+        const store = transaction.objectStore(STORE_NAME);
+        if (isPrivateSongRecord(existing) && existing.id !== record.id) store.delete(existing.id);
+        store.put(record);
         await transactionComplete(transaction);
         return record;
       } finally {

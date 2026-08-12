@@ -28,14 +28,15 @@ describe("private arrangement library", () => {
     expect(await library.get("older")).toBeNull();
   });
 
-  it("reuses an existing private result with the same checksum", async () => {
+  it("replaces an older analysis when the same recording is imported again", async () => {
     const library = createMemoryPrivateLibrary();
     const original = record("first", "same", "2026-01-01T00:00:00.000Z");
     await library.put(original);
     const stored = await library.put(record("duplicate", "same", "2026-02-01T00:00:00.000Z"));
 
-    expect(stored.id).toBe("first");
+    expect(stored.id).toBe("duplicate");
     expect(await library.list()).toHaveLength(1);
+    expect((await library.list())[0].id).toBe("duplicate");
   });
 
   it("skips corrupt records instead of breaking the whole library", async () => {
