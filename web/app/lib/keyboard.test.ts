@@ -3,28 +3,33 @@ import {
   defaultNoteFor,
   isPlayableCode,
   KEYBOARD_ROWS,
-  PLAYABLE_CODES,
+  PERFORMANCE_CODES,
 } from "./keyboard";
 
 describe("keyboard mapping", () => {
-  it("keeps ordinary QWERTY keys playable and browser-reserved keys disabled", () => {
-    expect(isPlayableCode("KeyN")).toBe(true);
-    expect(isPlayableCode("Digit1")).toBe(true);
-    expect(isPlayableCode("Space")).toBe(true);
-    expect(isPlayableCode("Escape")).toBe(false);
-    expect(isPlayableCode("F1")).toBe(false);
-    expect(isPlayableCode("Tab")).toBe(false);
+  it("exposes exactly the number row and alphabet as performance keys", () => {
+    expect(PERFORMANCE_CODES).toEqual([
+      "Digit1", "Digit2", "Digit3", "Digit4", "Digit5",
+      "Digit6", "Digit7", "Digit8", "Digit9", "Digit0",
+      ..."QWERTYUIOPASDFGHJKLZXCVBNM".split("").map((letter) => `Key${letter}`),
+    ]);
+    expect(PERFORMANCE_CODES).toHaveLength(36);
+    for (const code of ["Space", "Escape", "Backquote", "Minus", "ArrowLeft", "F1", "Tab"]) {
+      expect(isPlayableCode(code)).toBe(false);
+    }
   });
 
   it("gives every playable key one stable piano note", () => {
-    expect(new Set(PLAYABLE_CODES).size).toBe(PLAYABLE_CODES.length);
-    expect(PLAYABLE_CODES.every((code) => /^([A-G])(#|b)?[2-6]$/.test(defaultNoteFor(code)))).toBe(true);
-    expect(new Set(PLAYABLE_CODES.map(defaultNoteFor)).size).toBe(PLAYABLE_CODES.length);
+    expect(new Set(PERFORMANCE_CODES).size).toBe(PERFORMANCE_CODES.length);
+    expect(PERFORMANCE_CODES.every((code) => /^([A-G])#?[3-5]$/.test(defaultNoteFor(code)))).toBe(true);
+    expect(new Set(PERFORMANCE_CODES.map(defaultNoteFor)).size).toBe(PERFORMANCE_CODES.length);
+    expect(defaultNoteFor("Digit1")).toBe("C3");
+    expect(defaultNoteFor("KeyM")).toBe("B5");
   });
 
-  it("renders the function row as disabled instead of silently omitting it", () => {
-    const functionRow = KEYBOARD_ROWS[0];
-    expect(functionRow[0]).toMatchObject({ code: "Escape", disabled: true });
-    expect(functionRow.filter((key) => key.disabled)).toHaveLength(13);
+  it("renders only the four familiar performance rows", () => {
+    expect(KEYBOARD_ROWS).toHaveLength(4);
+    expect(KEYBOARD_ROWS.map((row) => row.length)).toEqual([10, 10, 9, 7]);
+    expect(KEYBOARD_ROWS.flat().some((key) => key.disabled)).toBe(false);
   });
 });

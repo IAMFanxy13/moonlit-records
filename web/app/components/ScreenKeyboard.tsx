@@ -16,7 +16,7 @@ export function ScreenKeyboard({ targetCode, feedback, pressedCodes }: ScreenKey
     <section className="keyboard-section" aria-label="Computer keyboard piano">
       <div className="keyboard-caption">
         <span>A free piano, with lyric initials as your guide.</span>
-        <span className="reserved-note"><i aria-hidden="true" />System keys remain with your browser.</span>
+        <span className="reserved-note"><i aria-hidden="true" />Numbers and letters. Nothing else to learn.</span>
       </div>
 
       <div className="screen-keyboard">

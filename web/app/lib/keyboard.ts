@@ -5,47 +5,20 @@ export interface KeyboardKey {
   disabled?: boolean;
 }
 
-const key = (code: string, label: string, width = 1, disabled = false): KeyboardKey => ({
-  code,
-  label,
-  width,
-  disabled,
-});
+const letterKeys = (letters: string): KeyboardKey[] =>
+  letters.split("").map((letter) => ({ code: `Key${letter}`, label: letter }));
 
 export const KEYBOARD_ROWS: KeyboardKey[][] = [
-  [
-    key("Escape", "esc", 1.35, true),
-    ...Array.from({ length: 12 }, (_, index) => key(`F${index + 1}`, `F${index + 1}`, 1, true)),
-  ],
-  [
-    key("Backquote", "·"),
-    ...Array.from({ length: 10 }, (_, index) => key(`Digit${(index + 1) % 10}`, `${(index + 1) % 10}`)),
-    key("Minus", "−"),
-    key("Equal", "="),
-  ],
-  [
-    ..."QWERTYUIOP".split("").map((letter) => key(`Key${letter}`, letter)),
-    key("BracketLeft", "["),
-    key("BracketRight", "]"),
-    key("Backslash", "\\", 1.35),
-  ],
-  [
-    ..."ASDFGHJKL".split("").map((letter) => key(`Key${letter}`, letter)),
-    key("Semicolon", ";"),
-    key("Quote", "'", 1.25),
-  ],
-  [
-    ..."ZXCVBNM".split("").map((letter) => key(`Key${letter}`, letter)),
-    key("Comma", ","),
-    key("Period", "."),
-    key("Slash", "/", 1.3),
-  ],
-  [key("Space", "SPACE", 7.2)],
+  "1234567890".split("").map((digit) => ({ code: `Digit${digit}`, label: digit })),
+  letterKeys("QWERTYUIOP"),
+  letterKeys("ASDFGHJKL"),
+  letterKeys("ZXCVBNM"),
 ];
 
-export const PLAYABLE_CODES = KEYBOARD_ROWS.flat()
-  .filter((item) => !item.disabled)
-  .map((item) => item.code);
+export const PERFORMANCE_CODES = KEYBOARD_ROWS.flat().map((item) => item.code);
+
+// Kept as a compatibility alias for older catalogue code.
+export const PLAYABLE_CODES = PERFORMANCE_CODES;
 
 const CHROMATIC_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -56,7 +29,7 @@ function noteForMidi(midi: number): string {
 }
 
 const DEFAULT_NOTES = new Map(
-  PLAYABLE_CODES.map((code, index) => [code, noteForMidi(40 + index)]),
+  PERFORMANCE_CODES.map((code, index) => [code, noteForMidi(48 + index)]),
 );
 
 export function isPlayableCode(code: string): boolean {
