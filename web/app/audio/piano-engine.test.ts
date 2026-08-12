@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPianoEngine } from "./piano-engine";
+import { getPianoVoiceProfile } from "./piano-voices";
 
 describe("piano engine", () => {
   it("normalizes MIDI velocity and forwards attack and release", async () => {
@@ -25,10 +26,29 @@ describe("piano engine", () => {
     expect(load).toHaveBeenCalledOnce();
     expect(resume).toHaveBeenCalledOnce();
     expect(configureVoice).toHaveBeenCalledWith("upright");
+    expect(piano.tailMs()).toBe(getPianoVoiceProfile("upright").tailMs);
     expect(sampler.triggerAttack).toHaveBeenCalledWith("G4", undefined, 112 / 127);
     expect(sampler.triggerRelease).toHaveBeenCalledWith("G4");
     expect(sampler.releaseAll).toHaveBeenCalledOnce();
     expect(sampler.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("changes its acoustic tail immediately with the selected voice", () => {
+    const sampler = {
+      triggerAttack: vi.fn(),
+      triggerRelease: vi.fn(),
+      releaseAll: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const piano = createPianoEngine({
+      sampler,
+      load: async () => undefined,
+      resume: async () => undefined,
+    });
+
+    expect(piano.tailMs()).toBe(getPianoVoiceProfile("warm").tailMs);
+    piano.setVoice("concert");
+    expect(piano.tailMs()).toBe(getPianoVoiceProfile("concert").tailMs);
   });
 
   it("clamps velocity to the sampler's zero-to-one range", () => {

@@ -1,4 +1,5 @@
 import type { PianoVoice } from "../lib/song";
+import { getPianoVoiceProfile } from "./piano-voices";
 
 type ToneSampler = import("tone").Sampler;
 
@@ -6,6 +7,7 @@ export interface PianoPort {
   load(): Promise<void>;
   resume(): Promise<void>;
   setVoice(voice: PianoVoice): void;
+  tailMs(): number;
   attack(note: string, velocity: number): void;
   release(note: string): void;
   releaseAll(): void;
@@ -28,11 +30,16 @@ interface PianoEngineDependencies {
 
 export function createPianoEngine(dependencies: PianoEngineDependencies): PianoPort {
   const { sampler, load, resume, configureVoice } = dependencies;
+  let currentVoice: PianoVoice = "warm";
   return {
     load,
     resume,
     setVoice(voice) {
+      currentVoice = voice;
       configureVoice?.(voice);
+    },
+    tailMs() {
+      return getPianoVoiceProfile(currentVoice).tailMs;
     },
     attack(note, velocity) {
       sampler.triggerAttack(note, undefined, Math.min(1, Math.max(0, velocity / 127)));
@@ -79,25 +86,26 @@ export function createBrowserPianoEngine(): PianoPort {
     loading = (async () => {
       const Tone = await import("tone");
       toneModule = Tone;
-      const reverb = new Tone.Reverb({ decay: 1.8, wet: 0.16 }).toDestination();
+      const initialProfile = getPianoVoiceProfile(currentVoice);
+      const reverb = new Tone.Reverb({
+        decay: initialProfile.reverbDecay,
+        preDelay: initialProfile.preDelay,
+        wet: initialProfile.wet,
+      }).toDestination();
       const filter = new Tone.Filter({ frequency: 4300, type: "lowpass", rolloff: -12 }).connect(reverb);
       sampler = new Tone.Sampler({
         urls: SAMPLE_URLS,
         baseUrl: "/audio/salamander/",
         attack: 0.004,
-        release: 1.3,
+        release: initialProfile.samplerRelease,
       }).connect(filter);
       configureLoadedVoice = (voice) => {
-        const profiles = {
-          warm: { cutoff: 3700, wet: 0.2, release: 1.45 },
-          concert: { cutoff: 5200, wet: 0.26, release: 1.75 },
-          bright: { cutoff: 6900, wet: 0.12, release: 1.05 },
-          upright: { cutoff: 4400, wet: 0.08, release: 0.82 },
-        } as const;
-        const profile = profiles[voice];
+        const profile = getPianoVoiceProfile(voice);
         filter.frequency.value = profile.cutoff;
         reverb.wet.value = profile.wet;
-        if (sampler) (sampler as ToneSampler).release = profile.release;
+        reverb.decay = profile.reverbDecay;
+        reverb.preDelay = profile.preDelay;
+        if (sampler) (sampler as ToneSampler).release = profile.samplerRelease;
       };
       configureLoadedVoice(currentVoice);
       disposeEffects = () => {
@@ -118,6 +126,9 @@ export function createBrowserPianoEngine(): PianoPort {
     setVoice(voice) {
       currentVoice = voice;
       configureLoadedVoice?.(voice);
+    },
+    tailMs() {
+      return getPianoVoiceProfile(currentVoice).tailMs;
     },
     attack(note, velocity) {
       sampler?.triggerAttack(note, undefined, Math.min(1, Math.max(0, velocity / 127)));
