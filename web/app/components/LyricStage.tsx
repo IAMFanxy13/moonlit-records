@@ -6,6 +6,8 @@ interface LyricStageProps {
   eventIndex: number;
 }
 
+const INSTRUMENTAL_ROUTE_LENGTH = 10;
+
 export function LyricStage({ song, eventIndex }: LyricStageProps) {
   const safeEventIndex = Math.min(eventIndex, Math.max(song.events.length - 1, 0));
   const currentEvent = song.events[safeEventIndex];
@@ -14,27 +16,58 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
   const nextPhrase = song.phrases[currentPhraseIndex + 1];
   const phraseEvents = song.events.slice(currentPhrase.startEvent, currentPhrase.endEvent + 1);
   const lyricPieces: Array<{ id: string; text: string; absoluteIndex?: number }> = [];
+  const instrumentalPhrase = phraseEvents.every((event) => event.token == null);
+  const relativeEventIndex = Math.max(0, safeEventIndex - currentPhrase.startEvent);
+  const instrumentalPageStart = Math.floor(relativeEventIndex / INSTRUMENTAL_ROUTE_LENGTH) * INSTRUMENTAL_ROUTE_LENGTH;
+  const visibleInstrumentalEvents = phraseEvents.slice(
+    instrumentalPageStart,
+    instrumentalPageStart + INSTRUMENTAL_ROUTE_LENGTH,
+  );
+  const nextInstrumentalEvents = phraseEvents.slice(
+    instrumentalPageStart + INSTRUMENTAL_ROUTE_LENGTH,
+    instrumentalPageStart + INSTRUMENTAL_ROUTE_LENGTH * 2,
+  );
+  const nextLineText = instrumentalPhrase
+    ? nextInstrumentalEvents.length > 0
+      ? nextInstrumentalEvents.map((event) => labelForCode(event.targetCode)).join(" ")
+      : "Let the final note find the room."
+    : nextPhrase?.text ?? "Let the final note find the room.";
   let eventOffset = 0;
-  Array.from(currentPhrase.text).forEach((character, characterIndex) => {
-    const event = phraseEvents[eventOffset];
-    if (event && (event.token === character || event.token.startsWith(character))) {
+
+  if (instrumentalPhrase) {
+    visibleInstrumentalEvents.forEach((event, index) => {
       lyricPieces.push({
         id: event.id,
-        text: character,
-        absoluteIndex: currentPhrase.startEvent + eventOffset,
+        text: labelForCode(event.targetCode),
+        absoluteIndex: currentPhrase.startEvent + instrumentalPageStart + index,
       });
-      eventOffset += 1;
-    } else {
-      lyricPieces.push({ id: `${currentPhrase.id}-punctuation-${characterIndex}`, text: character });
-    }
-  });
-  phraseEvents.slice(eventOffset).forEach((event, remainingIndex) => {
-    lyricPieces.push({
-      id: event.id,
-      text: event.token,
-      absoluteIndex: currentPhrase.startEvent + eventOffset + remainingIndex,
     });
-  });
+  } else {
+    Array.from(currentPhrase.text).forEach((character, characterIndex) => {
+      const event = phraseEvents[eventOffset];
+      if (
+        event &&
+        typeof event.token === "string" &&
+        (event.token === character || event.token.startsWith(character))
+      ) {
+        lyricPieces.push({
+          id: event.id,
+          text: character,
+          absoluteIndex: currentPhrase.startEvent + eventOffset,
+        });
+        eventOffset += 1;
+      } else {
+        lyricPieces.push({ id: `${currentPhrase.id}-punctuation-${characterIndex}`, text: character });
+      }
+    });
+    phraseEvents.slice(eventOffset).forEach((event, remainingIndex) => {
+      lyricPieces.push({
+        id: event.id,
+        text: event.token ?? labelForCode(event.targetCode),
+        absoluteIndex: currentPhrase.startEvent + eventOffset + remainingIndex,
+      });
+    });
+  }
 
   return (
     <section className="lyric-stage" aria-label="Lyric-guided performance">
@@ -83,7 +116,7 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
 
       <div className="next-lyric">
         <span>NEXT LINE</span>
-        <p className="next-line" lang={nextPhrase ? song.lyricLanguage : "en"}>{nextPhrase?.text ?? "Let the final note find the room."}</p>
+        <p className="next-line" lang={instrumentalPhrase ? "en" : nextPhrase ? song.lyricLanguage : "en"}>{nextLineText}</p>
       </div>
     </section>
   );

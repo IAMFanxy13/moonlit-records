@@ -3,7 +3,7 @@ import type { SongPackage } from "./song";
 
 export interface Mistake {
   eventIndex: number;
-  token: string;
+  token: string | null;
   pressedCode: string;
   expectedCode: string;
 }
@@ -123,7 +123,7 @@ export function pressKey(
           },
         ],
       },
-      sound: { notes: [defaultNoteFor(code)], velocity: 82, kind: "wrong" },
+      sound: { notes: [defaultNoteFor(code)], velocity: currentEvent.velocity, kind: "wrong" },
     };
   }
 

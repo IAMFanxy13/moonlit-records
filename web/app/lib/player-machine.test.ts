@@ -35,7 +35,7 @@ describe("player machine", () => {
 
     expect(result.sound).toEqual({
       notes: [defaultNoteFor(wrongCode)],
-      velocity: 82,
+      velocity: 92,
       kind: "wrong",
     });
     expect(result.state.eventIndex).toBe(0);

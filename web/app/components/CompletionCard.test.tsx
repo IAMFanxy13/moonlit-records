@@ -12,6 +12,7 @@ describe("CompletionCard", () => {
       eventIndex: 8,
       correctCount: 8,
       mistakes: [{ eventIndex: 0, token: "你", pressedCode: "KeyZ", expectedCode: "KeyN" }],
+      activeHold: null,
     };
     render(<CompletionCard song={builtinSongs[0]} state={state} onAgain={vi.fn()} onCatalog={vi.fn()} />);
 
