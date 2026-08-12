@@ -1,35 +1,49 @@
-# 月光唱片
+# Moonlit Records
 
-一款把电脑键盘变成钢琴的歌词引导演奏网页。
+An English-first, lyric-guided concert piano that turns a standard computer keyboard into a free instrument.
 
-## 已实现
+## The experience
 
-- 曲库内直接搜索歌名，首版收录三首人工校准曲目。
-- KTV 式当前句 / 下一句歌词，按字或英文首字母推进。
-- 屏幕还原标准电脑键盘；系统功能键保留，不参与演奏。
-- 每个安全按键都有自己的默认钢琴音高，随时可以即兴。
-- 当前目标键会临时改为歌曲旋律音高；弹错会响并标红，但不会推进。
-- 暖毡、音乐厅、明亮、旧立式四种琴色调音。
-- 失焦自动暂停、过滤长按连发、按键抬起释放琴音。
-- 桌面端完整演奏；手机端保留曲库与明确的电脑演奏提示。
+- Search the curated catalogue by English display metadata or hidden Chinese aliases.
+- Play every safe keyboard key freely at any time; each key owns a stable default piano note.
+- Follow Chinese pinyin initials or English word initials to play a song melody through familiar typing gestures.
+- See KTV-style current and next lyric lines, with the required key illuminated on a full screen keyboard.
+- Hear wrong keys as ordinary free-play notes. They mark red but do not advance the lyric; the expected key continues waiting.
+- Hold a physical key to sustain its exact note and release that same key to begin the natural envelope. Independent held keys form real chords.
+- Continue improvising after the final lyric note. Completion waits until every held key is released and the selected hall tail has fully faded.
 
-## 本地运行
+## Piano voices
 
-需要 Node.js 22.13 或更高版本。
+Moonlit Records recommends a voice per arrangement while keeping all four available during performance:
+
+- **Felt Grand** — intimate, softened and lyrical; recommended for *Hello, Moonlight*.
+- **Studio Grand** — clear, articulate and close; recommended for *Twinkle, Twinkle, Little Star*.
+- **Vintage Upright** — dry, characterful and nostalgic.
+- **Concert Grand** — open, resonant and hall-sized; recommended for *Ode to Joy · Excerpt*.
+
+All voices use local Salamander Grand samples with individual filtering, release, pre-delay, reverb and completion-tail profiles.
+
+## Run locally
+
+Requires Node.js 22.13 or newer.
 
 ```bash
 npm install
 npm run dev
 ```
 
-验证：
+Verification:
 
 ```bash
 npm test
 npm run test:render
-npx tsc --noEmit
+npm run build
 ```
 
-## 声音与版权
+## Audio and rights
 
-钢琴采样来自 Salamander Grand Piano，使用 CC BY 3.0 许可；详细署名见 `public/audio/ATTRIBUTION.md`。首版歌曲均为原创内容或公版旋律的人工校准片段，不抓取、不热链受版权保护的歌词与音频。
+The piano samples come from Salamander Grand Piano under CC BY 3.0; see `public/audio/ATTRIBUTION.md`. The included score fragments are original material or manually calibrated public-domain melodies. The application does not scrape or hotlink copyrighted lyrics or audio.
+
+## Deployment
+
+The site is configured for a private OpenAI Sites project in `.openai/hosting.json`. Publishing replaces the current private version without changing the project identity.

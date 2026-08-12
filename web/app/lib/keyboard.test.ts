@@ -19,6 +19,7 @@ describe("keyboard mapping", () => {
   it("gives every playable key one stable piano note", () => {
     expect(new Set(PLAYABLE_CODES).size).toBe(PLAYABLE_CODES.length);
     expect(PLAYABLE_CODES.every((code) => /^([A-G])(#|b)?[2-6]$/.test(defaultNoteFor(code)))).toBe(true);
+    expect(new Set(PLAYABLE_CODES.map(defaultNoteFor)).size).toBe(PLAYABLE_CODES.length);
   });
 
   it("renders the function row as disabled instead of silently omitting it", () => {
