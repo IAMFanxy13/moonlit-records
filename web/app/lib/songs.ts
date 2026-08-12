@@ -79,9 +79,10 @@ const odeEvents = [
 export const builtinSongs: SongPackage[] = [
   {
     id: "hello-moonlight",
-    title: "你好，月光",
-    artist: "月光唱片 · 原创",
-    version: "夜航练习版",
+    title: "Hello, Moonlight",
+    artist: "Moonlit Records · Original",
+    version: "Night Passage Study",
+    searchAliases: ["你好月光", "你好，月光", "月光", "原创", "夜航练习版"],
     durationLabel: "00:28",
     recommendedPiano: "warm",
     phrases: [
@@ -92,9 +93,10 @@ export const builtinSongs: SongPackage[] = [
   },
   {
     id: "little-star",
-    title: "小星星",
-    artist: "佚名",
-    version: "公版童谣",
+    title: "Twinkle, Twinkle, Little Star",
+    artist: "Traditional · Anonymous",
+    version: "Public-domain Lullaby",
+    searchAliases: ["小星星", "一闪一闪亮晶晶", "佚名", "童谣"],
     durationLabel: "00:46",
     recommendedPiano: "bright",
     phrases: [
@@ -105,9 +107,10 @@ export const builtinSongs: SongPackage[] = [
   },
   {
     id: "ode-to-joy",
-    title: "欢乐颂·片段",
-    artist: "贝多芬",
-    version: "公版旋律 · 无歌词",
+    title: "Ode to Joy · Excerpt",
+    artist: "Ludwig van Beethoven",
+    version: "Public-domain Melody · Instrumental",
+    searchAliases: ["欢乐颂", "贝多芬", "片段", "无歌词"],
     durationLabel: "00:24",
     recommendedPiano: "concert",
     phrases: [

@@ -22,6 +22,7 @@ export interface SongPackage {
   title: string;
   artist: string;
   version: string;
+  searchAliases: string[];
   durationLabel: string;
   recommendedPiano: PianoVoice;
   phrases: Phrase[];
