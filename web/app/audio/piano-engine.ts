@@ -1,6 +1,11 @@
+import type { PianoVoice } from "../lib/song";
+
+type ToneSampler = import("tone").Sampler;
+
 export interface PianoPort {
   load(): Promise<void>;
   resume(): Promise<void>;
+  setVoice(voice: PianoVoice): void;
   attack(note: string, velocity: number): void;
   release(note: string): void;
   releaseAll(): void;
@@ -18,13 +23,17 @@ interface PianoEngineDependencies {
   sampler: SamplerPort;
   load: () => Promise<void>;
   resume: () => Promise<void>;
+  configureVoice?: (voice: PianoVoice) => void;
 }
 
 export function createPianoEngine(dependencies: PianoEngineDependencies): PianoPort {
-  const { sampler, load, resume } = dependencies;
+  const { sampler, load, resume, configureVoice } = dependencies;
   return {
     load,
     resume,
+    setVoice(voice) {
+      configureVoice?.(voice);
+    },
     attack(note, velocity) {
       sampler.triggerAttack(note, undefined, Math.min(1, Math.max(0, velocity / 127)));
     },
@@ -62,6 +71,8 @@ export function createBrowserPianoEngine(): PianoPort {
   let disposeEffects: (() => void) | null = null;
   let toneModule: typeof import("tone") | null = null;
   let loading: Promise<void> | null = null;
+  let currentVoice: PianoVoice = "warm";
+  let configureLoadedVoice: ((voice: PianoVoice) => void) | null = null;
 
   const load = async () => {
     if (loading) return loading;
@@ -76,6 +87,19 @@ export function createBrowserPianoEngine(): PianoPort {
         attack: 0.004,
         release: 1.3,
       }).connect(filter);
+      configureLoadedVoice = (voice) => {
+        const profiles = {
+          warm: { cutoff: 3700, wet: 0.2, release: 1.45 },
+          concert: { cutoff: 5200, wet: 0.26, release: 1.75 },
+          bright: { cutoff: 6900, wet: 0.12, release: 1.05 },
+          upright: { cutoff: 4400, wet: 0.08, release: 0.82 },
+        } as const;
+        const profile = profiles[voice];
+        filter.frequency.value = profile.cutoff;
+        reverb.wet.value = profile.wet;
+        if (sampler) (sampler as ToneSampler).release = profile.release;
+      };
+      configureLoadedVoice(currentVoice);
       disposeEffects = () => {
         filter.dispose();
         reverb.dispose();
@@ -91,6 +115,10 @@ export function createBrowserPianoEngine(): PianoPort {
       if (!toneModule) toneModule = await import("tone");
       await toneModule.start();
     },
+    setVoice(voice) {
+      currentVoice = voice;
+      configureLoadedVoice?.(voice);
+    },
     attack(note, velocity) {
       sampler?.triggerAttack(note, undefined, Math.min(1, Math.max(0, velocity / 127)));
     },
@@ -105,6 +133,7 @@ export function createBrowserPianoEngine(): PianoPort {
       disposeEffects?.();
       sampler = null;
       disposeEffects = null;
+      configureLoadedVoice = null;
     },
   };
 }

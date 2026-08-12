@@ -11,10 +11,12 @@ describe("piano engine", () => {
     };
     const load = vi.fn().mockResolvedValue(undefined);
     const resume = vi.fn().mockResolvedValue(undefined);
-    const piano = createPianoEngine({ sampler, load, resume });
+    const configureVoice = vi.fn();
+    const piano = createPianoEngine({ sampler, load, resume, configureVoice });
 
     await piano.load();
     await piano.resume();
+    piano.setVoice("upright");
     piano.attack("G4", 112);
     piano.release("G4");
     piano.releaseAll();
@@ -22,6 +24,7 @@ describe("piano engine", () => {
 
     expect(load).toHaveBeenCalledOnce();
     expect(resume).toHaveBeenCalledOnce();
+    expect(configureVoice).toHaveBeenCalledWith("upright");
     expect(sampler.triggerAttack).toHaveBeenCalledWith("G4", undefined, 112 / 127);
     expect(sampler.triggerRelease).toHaveBeenCalledWith("G4");
     expect(sampler.releaseAll).toHaveBeenCalledOnce();
