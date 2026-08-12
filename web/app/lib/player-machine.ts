@@ -31,8 +31,14 @@ export interface KeyResult {
   sound: PianoSound | null;
 }
 
-export function createPlayerState(_song: SongPackage): PlayerState {
-  return { status: "ready", eventIndex: 0, correctCount: 0, mistakes: [], activeHold: null };
+export function createPlayerState(song: SongPackage): PlayerState {
+  return {
+    status: song.events.length === 0 ? "complete" : "ready",
+    eventIndex: 0,
+    correctCount: 0,
+    mistakes: [],
+    activeHold: null,
+  };
 }
 
 export function startPlayer(state: PlayerState): PlayerState {
@@ -45,8 +51,15 @@ export function togglePause(state: PlayerState): PlayerState {
   return state;
 }
 
-export function restartPlayer(_state: PlayerState): PlayerState {
-  return { status: "ready", eventIndex: 0, correctCount: 0, mistakes: [], activeHold: null };
+export function restartPlayer(state: PlayerState): PlayerState {
+  return {
+    ...state,
+    status: "ready",
+    eventIndex: 0,
+    correctCount: 0,
+    mistakes: [],
+    activeHold: null,
+  };
 }
 
 export function finishRinging(state: PlayerState): PlayerState {

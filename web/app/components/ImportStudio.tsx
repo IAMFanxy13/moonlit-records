@@ -13,22 +13,23 @@ type AnalyzeMedia = (
   onProgress: (progress: ImportProgress) => void,
 ) => Promise<PrivateSongRecord>;
 
-type EnrichRecord = (record: PrivateSongRecord) => Promise<PrivateSongRecord>;
+type EnrichRecord = (record: PrivateSongRecord, signal?: AbortSignal) => Promise<PrivateSongRecord>;
 
 interface ImportStudioProps {
   analyze?: AnalyzeMedia;
   enrich?: EnrichRecord;
+  enrichmentTimeoutMs?: number;
   onImported: (record: PrivateSongRecord) => void;
   onPerform: (song: SongPackage) => void;
 }
 
-async function enrichFromFreeSources(record: PrivateSongRecord): Promise<PrivateSongRecord> {
+async function enrichFromFreeSources(record: PrivateSongRecord, signal?: AbortSignal): Promise<PrivateSongRecord> {
   const query = new URLSearchParams({
     title: record.metadata.title,
     artist: record.metadata.artist,
     durationMs: String(record.metadata.durationMs ?? 0),
   });
-  const response = await fetch(`/api/enrich?${query}`);
+  const response = await fetch(`/api/enrich?${query}`, { signal });
   if (!response.ok) throw new Error("Enrichment unavailable");
   const enrichment = await response.json() as TrackEnrichment;
   const metadata = {
@@ -56,6 +57,7 @@ async function enrichFromFreeSources(record: PrivateSongRecord): Promise<Private
 export function ImportStudio({
   analyze = analyzeMediaFile,
   enrich = enrichFromFreeSources,
+  enrichmentTimeoutMs = 6000,
   onImported,
   onPerform,
 }: ImportStudioProps) {
@@ -74,10 +76,20 @@ export function ImportStudio({
     try {
       const localRecord = await analyze(file, setProgress);
       let finalRecord = localRecord;
+      const controller = new AbortController();
+      let enrichmentTimer: number | null = null;
       try {
-        finalRecord = await enrich(localRecord);
+        const timedOut = new Promise<never>((_resolve, reject) => {
+          enrichmentTimer = window.setTimeout(() => {
+            controller.abort();
+            reject(new Error("Optional online enrichment timed out."));
+          }, enrichmentTimeoutMs);
+        });
+        finalRecord = await Promise.race([enrich(localRecord, controller.signal), timedOut]);
       } catch {
         setOnlineWarning(true);
+      } finally {
+        if (enrichmentTimer !== null) window.clearTimeout(enrichmentTimer);
       }
       setProgress({ stage: "ready", detail: "Your private piano arrangement is ready." });
       setRecord(finalRecord);

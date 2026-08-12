@@ -65,4 +65,24 @@ describe("ImportStudio", () => {
     expect(await screen.findByText("READY TO PERFORM")).toBeInTheDocument();
     expect(screen.getByText(/Online details were unavailable/)).toBeInTheDocument();
   });
+
+  it("stops waiting for optional online details and keeps the local arrangement", async () => {
+    const user = userEvent.setup();
+    render(
+      <ImportStudio
+        analyze={async () => imported}
+        enrich={() => new Promise(() => undefined)}
+        enrichmentTimeoutMs={5}
+        onImported={vi.fn()}
+        onPerform={vi.fn()}
+      />,
+    );
+    await user.upload(
+      screen.getByLabelText("Choose audio or video"),
+      new File([new Uint8Array([1])], "Song.mp3", { type: "audio/mpeg" }),
+    );
+
+    expect(await screen.findByText("READY TO PERFORM")).toBeInTheDocument();
+    expect(screen.getByText(/Online details were unavailable/)).toBeInTheDocument();
+  });
 });

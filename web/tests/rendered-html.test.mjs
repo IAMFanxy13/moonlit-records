@@ -20,7 +20,9 @@ test("server-renders the moonlit song catalog", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="en"/);
   assert.match(html, /<title>Moonlit Records · Your Keyboard, in Concert<\/title>/i);
-  assert.match(html, /Find your song/);
+  assert.match(html, /Bring your own recording/);
+  assert.match(html, /Import audio or video/);
+  assert.match(html, /NO SUBSCRIPTION · NO PAID API · YOUR FILE STAYS PRIVATE/);
   assert.match(html, /Twinkle, Twinkle, Little Star/);
   assert.match(html, /Search title, artist, or lyric/);
   assert.match(html, /https:\/\/moonlit-records-piano\.nieqingcao-stu1\.chatgpt\.site\/og\.png/);

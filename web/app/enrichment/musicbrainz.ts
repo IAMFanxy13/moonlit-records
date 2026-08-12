@@ -30,8 +30,8 @@ function field<T>(value: T, recordId: string, confidence: number): EnrichedField
 export async function enrichTrack(query: EnrichmentQuery, fetcher: FreeFetcher = fetch): Promise<TrackEnrichment> {
   try {
     const search = new URL("https://musicbrainz.org/ws/2/recording");
-    const artistQuery = query.artist === "Unknown Artist" ? "" : ` AND artist:\"${query.artist}\"`;
-    search.searchParams.set("query", `recording:\"${query.title}\"${artistQuery}`);
+    const artistQuery = query.artist === "Unknown Artist" ? "" : ` AND artist:"${query.artist}"`;
+    search.searchParams.set("query", `recording:"${query.title}"${artistQuery}`);
     search.searchParams.set("fmt", "json");
     search.searchParams.set("limit", "8");
     const response = await fetcher(search, {
