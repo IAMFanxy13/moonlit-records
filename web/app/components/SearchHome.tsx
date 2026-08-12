@@ -3,24 +3,29 @@
 import { useMemo, useState } from "react";
 
 import { getPianoVoiceProfile } from "../audio/piano-voices";
+import type { PrivateSongRecord } from "../import/types";
 import type { SongPackage } from "../lib/song";
+import { ImportStudio } from "./ImportStudio";
 
 interface SearchHomeProps {
   songs: SongPackage[];
+  privateSongs?: SongPackage[];
   onChoose: (song: SongPackage) => void;
+  onImported?: (record: PrivateSongRecord) => void;
 }
 
-export function SearchHome({ songs, onChoose }: SearchHomeProps) {
+export function SearchHome({ songs, privateSongs = [], onChoose, onImported = () => undefined }: SearchHomeProps) {
   const [query, setQuery] = useState("");
+  const allSongs = useMemo(() => [...privateSongs, ...songs], [privateSongs, songs]);
   const filteredSongs = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
-    if (!normalized) return songs;
-    return songs.filter((song) =>
+    if (!normalized) return allSongs;
+    return allSongs.filter((song) =>
       [song.title, song.artist, song.version, ...song.searchAliases].some((value) =>
         value.toLocaleLowerCase().includes(normalized),
       ),
     );
-  }, [query, songs]);
+  }, [allSongs, query]);
 
   return (
     <main className="search-home">
@@ -29,36 +34,39 @@ export function SearchHome({ songs, onChoose }: SearchHomeProps) {
           <span className="wordmark-mark" aria-hidden="true">M</span>
           <span>MOONLIT RECORDS</span>
         </a>
-        <span className="topbar-note">YOUR KEYBOARD, IN CONCERT · EST. AFTER DARK</span>
+        <span className="topbar-note">A PRIVATE INSTRUMENT · EST. AFTER DARK</span>
       </nav>
 
-      <section className="search-hero" id="top">
-        <p className="eyebrow">A PRIVATE CONCERT, ONE KEY AT A TIME</p>
-        <h1>Find your song</h1>
-        <p className="hero-copy">Play freely, or let lyric initials turn familiar words into melody.</p>
-
-        <label className="song-search">
-          <span className="sr-only">Search songs</span>
-          <span className="search-glyph" aria-hidden="true">⌕</span>
-          <input
-            type="search"
-            aria-label="Search songs"
-            placeholder="Search title, artist, or lyric…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <kbd>ENTER</kbd>
-        </label>
+      <section className="search-hero import-first-hero" id="top">
+        <div className="hero-declaration">
+          <p className="eyebrow">YOUR RECORDING, ARRANGED FOR THE KEYS</p>
+          <p className="hero-kicker">A private recital begins with music you already love.</p>
+          <div className="hero-rule" aria-hidden="true"><i /><span>Ⅰ</span></div>
+          <p className="hero-aside">Every piano sound waits for your hands. Hold the computer key as you would hold the piano key.</p>
+        </div>
+        <ImportStudio onImported={onImported} onPerform={onChoose} />
       </section>
 
       <section className="catalog" aria-labelledby="catalog-title">
-        <div className="section-heading">
+        <div className="section-heading library-heading">
           <div>
-            <p className="eyebrow">CURATED FOR THE KEYS</p>
+            <p className="eyebrow">YOUR LIBRARY &amp; PREPARED SCORES</p>
             <h2 id="catalog-title">The night&apos;s repertoire</h2>
           </div>
           <span>{String(filteredSongs.length).padStart(2, "0")} SCORES PREPARED</span>
         </div>
+
+        <label className="song-search library-search">
+          <span className="search-glyph" aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            aria-label="Search your library"
+            placeholder="Search title, artist, or lyric…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <kbd>LIBRARY</kbd>
+        </label>
 
         <div className="song-list">
           {filteredSongs.map((song, index) => (
@@ -74,7 +82,7 @@ export function SearchHome({ songs, onChoose }: SearchHomeProps) {
                 <strong>{song.title}</strong>
                 <small>{song.artist} · {song.version}</small>
               </span>
-              <span className="song-piano">RECOMMENDED · {getPianoVoiceProfile(song.recommendedPiano).name}</span>
+              <span className="song-piano" data-quality={song.quality}>RECOMMENDED · {getPianoVoiceProfile(song.recommendedPiano).name}</span>
               <span className="song-duration">{song.durationLabel}</span>
               <span className="song-arrow" aria-hidden="true">↗</span>
             </button>
@@ -84,15 +92,15 @@ export function SearchHome({ songs, onChoose }: SearchHomeProps) {
         {filteredSongs.length === 0 && (
           <div className="empty-catalog" role="status">
             <span aria-hidden="true">○</span>
-            <p>That song is still beyond tonight&apos;s catalogue.</p>
-            <small>Try another title, artist, or lyric phrase.</small>
+            <p>No private arrangement carries that name yet.</p>
+            <small>Import the recording above and it will join this library.</small>
           </div>
         )}
       </section>
 
       <footer className="home-footer">
         <span>A little room for music after words.</span>
-        <span>PRIVATE LISTENING ROOM · SALAMANDER GRAND</span>
+        <span>PRIVATE LISTENING ROOM · 36-KEY GRAND</span>
       </footer>
     </main>
   );

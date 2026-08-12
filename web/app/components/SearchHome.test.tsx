@@ -11,8 +11,8 @@ describe("SearchHome", () => {
     const onChoose = vi.fn();
     render(<SearchHome songs={builtinSongs} onChoose={onChoose} />);
 
-    expect(screen.getByRole("heading", { name: "Find your song" })).toBeInTheDocument();
-    await user.type(screen.getByRole("searchbox", { name: "Search songs" }), "星星");
+    expect(screen.getByRole("heading", { name: "Bring your own recording" })).toBeInTheDocument();
+    await user.type(screen.getByRole("searchbox", { name: "Search your library" }), "星星");
 
     expect(screen.getByText("Twinkle, Twinkle, Little Star")).toBeInTheDocument();
     expect(screen.queryByText("Hello, Moonlight")).not.toBeInTheDocument();
@@ -28,5 +28,13 @@ describe("SearchHome", () => {
     expect(screen.getByText("MOONLIT RECORDS")).toBeInTheDocument();
     expect(screen.getByText("A little room for music after words.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "The night's repertoire" })).toBeInTheDocument();
+  });
+
+  it("makes private recording import more prominent than catalogue search", () => {
+    render(<SearchHome songs={builtinSongs} onChoose={vi.fn()} />);
+
+    expect(screen.getByText("NO SUBSCRIPTION · NO PAID API · YOUR FILE STAYS PRIVATE")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search your library" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open Twinkle, Twinkle, Little Star/ })).toBeInTheDocument();
   });
 });

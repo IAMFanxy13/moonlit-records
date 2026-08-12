@@ -7,6 +7,8 @@ import { getPianoVoiceProfile } from "./audio/piano-voices";
 import { CompletionCard } from "./components/CompletionCard";
 import { PlayerShell } from "./components/PlayerShell";
 import { SearchHome } from "./components/SearchHome";
+import { createIndexedDbPrivateLibrary, type PrivateLibrary } from "./import/private-library";
+import type { PrivateSongRecord } from "./import/types";
 import type { PlayerState } from "./lib/player-machine";
 import type { SongPackage } from "./lib/song";
 import { builtinSongs } from "./lib/songs";
@@ -15,19 +17,40 @@ type View = "search" | "loading" | "entrance" | "player" | "complete" | "error";
 
 interface MoonlitPianoProps {
   piano?: PianoPort;
+  privateLibrary?: PrivateLibrary;
 }
 
-export function MoonlitPiano({ piano: injectedPiano }: MoonlitPianoProps) {
+export function MoonlitPiano({ piano: injectedPiano, privateLibrary: injectedLibrary }: MoonlitPianoProps) {
   const [piano] = useState<PianoPort>(() => injectedPiano ?? createBrowserPianoEngine());
+  const [privateLibrary] = useState<PrivateLibrary>(() => injectedLibrary ?? createIndexedDbPrivateLibrary());
   const ownsPiano = useRef(!injectedPiano);
   const [view, setView] = useState<View>("search");
   const [selectedSong, setSelectedSong] = useState<SongPackage | null>(null);
   const [finalState, setFinalState] = useState<PlayerState | null>(null);
+  const [privateRecords, setPrivateRecords] = useState<PrivateSongRecord[]>([]);
   const loadRequest = useRef(0);
 
   useEffect(() => () => {
     if (ownsPiano.current) piano.dispose();
   }, [piano]);
+
+  useEffect(() => {
+    let active = true;
+    void privateLibrary.list().then((records) => {
+      if (active) setPrivateRecords(records);
+    }).catch(() => {
+      // Private browsing modes may disable IndexedDB; importing still works for this visit.
+    });
+    return () => { active = false; };
+  }, [privateLibrary]);
+
+  const rememberImportedSong = (record: PrivateSongRecord) => {
+    void privateLibrary.put(record).then((stored) => {
+      setPrivateRecords((current) => [stored, ...current.filter((item) => item.id !== stored.id)]);
+    }).catch(() => {
+      setPrivateRecords((current) => [record, ...current.filter((item) => item.id !== record.id)]);
+    });
+  };
 
   const chooseSong = async (song: SongPackage) => {
     const request = ++loadRequest.current;
@@ -60,7 +83,16 @@ export function MoonlitPiano({ piano: injectedPiano }: MoonlitPianoProps) {
     setFinalState(null);
   };
 
-  if (view === "search") return <SearchHome songs={builtinSongs} onChoose={chooseSong} />;
+  if (view === "search") {
+    return (
+      <SearchHome
+        songs={builtinSongs}
+        privateSongs={privateRecords.map((record) => record.song)}
+        onImported={rememberImportedSong}
+        onChoose={chooseSong}
+      />
+    );
+  }
 
   if ((view === "loading" || view === "entrance" || view === "error") && selectedSong) {
     return (
