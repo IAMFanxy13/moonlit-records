@@ -18,6 +18,7 @@ import {
 } from "../lib/player-machine";
 import type { PianoVoice, SongPackage } from "../lib/song";
 import { LyricStage } from "./LyricStage";
+import { RhythmGuide } from "./RhythmGuide";
 import { ScreenKeyboard, type KeyFeedback } from "./ScreenKeyboard";
 
 interface PlayerShellProps {
@@ -220,6 +221,10 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
       </div>
 
       <LyricStage song={song} eventIndex={playerState.eventIndex} />
+
+      {!["ringing", "complete"].includes(playerState.status) && (
+        <RhythmGuide song={song} eventIndex={playerState.eventIndex} pressedCodes={pressedCodes} />
+      )}
 
       <div className="performance-status" data-kind={playerState.status === "ringing" ? "ringing" : feedback?.kind ?? playerState.status} aria-live="polite">
         <span>

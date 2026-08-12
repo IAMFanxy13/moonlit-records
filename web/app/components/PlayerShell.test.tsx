@@ -57,6 +57,20 @@ describe("PlayerShell", () => {
     expect(piano.attack).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps the user-driven rhythm guide in the performance view", () => {
+    render(
+      <PlayerShell
+        song={builtinSongs[0]}
+        piano={fakePiano()}
+        onExit={vi.fn()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Rhythm guide")).toBeInTheDocument();
+    expect(screen.getByText(/TAP · N/u)).toBeInTheDocument();
+  });
+
   it("holds each attacked note until its own keyup and supports chords", () => {
     const piano = fakePiano();
     render(
