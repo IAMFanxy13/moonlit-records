@@ -83,6 +83,7 @@ export const builtinSongs: SongPackage[] = [
     artist: "Moonlit Records · Original",
     version: "Night Passage Study",
     searchAliases: ["你好月光", "你好，月光", "月光", "原创", "夜航练习版"],
+    lyricLanguage: "zh-CN",
     durationLabel: "00:28",
     recommendedPiano: "warm",
     phrases: [
@@ -97,6 +98,7 @@ export const builtinSongs: SongPackage[] = [
     artist: "Traditional · Anonymous",
     version: "Public-domain Lullaby",
     searchAliases: ["小星星", "一闪一闪亮晶晶", "佚名", "童谣"],
+    lyricLanguage: "zh-CN",
     durationLabel: "00:46",
     recommendedPiano: "bright",
     phrases: [
@@ -111,6 +113,7 @@ export const builtinSongs: SongPackage[] = [
     artist: "Ludwig van Beethoven",
     version: "Public-domain Melody · Instrumental",
     searchAliases: ["欢乐颂", "贝多芬", "片段", "无歌词"],
+    lyricLanguage: "zh-CN",
     durationLabel: "00:24",
     recommendedPiano: "concert",
     phrases: [

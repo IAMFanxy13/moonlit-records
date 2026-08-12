@@ -18,10 +18,11 @@ test("server-renders the moonlit song catalog", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<html lang="zh-CN"/);
-  assert.match(html, /<title>月光唱片 · 用你的键盘，弹一首歌<\/title>/i);
-  assert.match(html, /今晚，想弹哪一首？/);
-  assert.match(html, /小星星/);
-  assert.match(html, /搜索一首歌/);
+  assert.match(html, /<html lang="en"/);
+  assert.match(html, /<title>Moonlit Records · Your Keyboard, in Concert<\/title>/i);
+  assert.match(html, /Find your song/);
+  assert.match(html, /Twinkle, Twinkle, Little Star/);
+  assert.match(html, /Search title, artist, or lyric/);
+  assert.match(html, /https:\/\/moonlit-records-piano\.nieqingcao-stu1\.chatgpt\.site\/og\.png/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/);
 });

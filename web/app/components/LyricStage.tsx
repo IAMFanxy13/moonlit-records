@@ -37,15 +37,15 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
   });
 
   return (
-    <section className="lyric-stage" aria-label="歌词引导">
+    <section className="lyric-stage" aria-label="Lyric-guided performance">
       <div className="lyric-meta">
-        <span>NOW PLAYING</span>
+        <span>CURRENT LINE</span>
         <span>{String(currentPhraseIndex + 1).padStart(2, "0")} / {String(song.phrases.length).padStart(2, "0")}</span>
       </div>
 
       <div className="current-lyric">
-        <p className="lyric-line sr-only">{currentPhrase.text}</p>
-        <div className="lyric-progress" aria-label={`当前歌词：${currentPhrase.text}`}>
+        <p className="lyric-line sr-only" lang={song.lyricLanguage}>{currentPhrase.text}</p>
+        <div className="lyric-progress" lang={song.lyricLanguage} aria-label={`Current lyric: ${currentPhrase.text}`}>
           {lyricPieces.map((piece) => {
             if (piece.absoluteIndex === undefined) {
               return <span className="lyric-punctuation" aria-hidden="true" key={piece.id}>{piece.text}</span>;
@@ -61,7 +61,7 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
               <span key={piece.id} className="lyric-token-wrap">
                 <span className="lyric-token" data-token-state={tokenState}>{piece.text}</span>
                 {tokenState === "current" && (
-                  <span className="lyric-key" aria-label={`请按 ${labelForCode(event.targetCode)}`}>
+                  <span className="lyric-key" aria-label={`Press ${labelForCode(event.targetCode)}`}>
                     {labelForCode(event.targetCode)}
                   </span>
                 )}
@@ -72,8 +72,8 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
       </div>
 
       <div className="next-lyric">
-        <span>下一句</span>
-        <p className="next-line">{nextPhrase?.text ?? "尾音落下，留一会儿安静"}</p>
+        <span>NEXT LINE</span>
+        <p className="next-line" lang={nextPhrase ? song.lyricLanguage : "en"}>{nextPhrase?.text ?? "Let the final note find the room."}</p>
       </div>
     </section>
   );

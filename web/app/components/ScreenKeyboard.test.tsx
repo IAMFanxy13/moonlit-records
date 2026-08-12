@@ -16,6 +16,7 @@ describe("ScreenKeyboard", () => {
     expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "target");
     expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "wrong");
     expect(screen.getByTestId("key-Escape")).toBeDisabled();
-    expect(screen.getByText("功能键留给浏览器与系统")).toBeInTheDocument();
+    expect(screen.getByText("System keys remain with your browser.")).toBeInTheDocument();
+    expect(screen.getByText("A free piano, with lyric initials as your guide.")).toBeInTheDocument();
   });
 });

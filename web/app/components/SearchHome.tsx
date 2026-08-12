@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { getPianoVoiceProfile } from "../audio/piano-voices";
 import type { SongPackage } from "../lib/song";
 
 interface SearchHomeProps {
@@ -9,47 +10,40 @@ interface SearchHomeProps {
   onChoose: (song: SongPackage) => void;
 }
 
-const PIANO_NAMES = {
-  warm: "暖毡三角钢琴",
-  concert: "音乐厅三角钢琴",
-  bright: "明亮三角钢琴",
-  upright: "旧式立式钢琴",
-} as const;
-
 export function SearchHome({ songs, onChoose }: SearchHomeProps) {
   const [query, setQuery] = useState("");
   const filteredSongs = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase("zh-CN");
+    const normalized = query.trim().toLocaleLowerCase();
     if (!normalized) return songs;
     return songs.filter((song) =>
-      [song.title, song.artist, song.version].some((value) =>
-        value.toLocaleLowerCase("zh-CN").includes(normalized),
+      [song.title, song.artist, song.version, ...song.searchAliases].some((value) =>
+        value.toLocaleLowerCase().includes(normalized),
       ),
     );
   }, [query, songs]);
 
   return (
     <main className="search-home">
-      <nav className="topbar" aria-label="网站导航">
-        <a className="wordmark" href="#top" aria-label="月光唱片首页">
-          <span className="wordmark-mark" aria-hidden="true">月</span>
-          <span>月光唱片</span>
+      <nav className="topbar" aria-label="Primary navigation">
+        <a className="wordmark" href="#top" aria-label="Moonlit Records home">
+          <span className="wordmark-mark" aria-hidden="true">M</span>
+          <span>MOONLIT RECORDS</span>
         </a>
-        <span className="topbar-note">KEYS BECOME MELODY</span>
+        <span className="topbar-note">YOUR KEYBOARD, IN CONCERT · EST. AFTER DARK</span>
       </nav>
 
       <section className="search-hero" id="top">
-        <p className="eyebrow">A QUIET INSTRUMENT FOR ONE</p>
-        <h1>今晚，想弹哪一首？</h1>
-        <p className="hero-copy">不必会钢琴。跟着歌词，按亮起的键，让电脑键盘替你唱。</p>
+        <p className="eyebrow">A PRIVATE CONCERT, ONE KEY AT A TIME</p>
+        <h1>Find your song</h1>
+        <p className="hero-copy">Play freely, or let lyric initials turn familiar words into melody.</p>
 
         <label className="song-search">
-          <span className="sr-only">搜索歌名</span>
+          <span className="sr-only">Search songs</span>
           <span className="search-glyph" aria-hidden="true">⌕</span>
           <input
             type="search"
-            aria-label="搜索歌名"
-            placeholder="搜索一首歌…"
+            aria-label="Search songs"
+            placeholder="Search title, artist, or lyric…"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -60,10 +54,10 @@ export function SearchHome({ songs, onChoose }: SearchHomeProps) {
       <section className="catalog" aria-labelledby="catalog-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">MOONLIT SELECTION</p>
-            <h2 id="catalog-title">今夜曲库</h2>
+            <p className="eyebrow">CURATED FOR THE KEYS</p>
+            <h2 id="catalog-title">The night&apos;s repertoire</h2>
           </div>
-          <span>{String(filteredSongs.length).padStart(2, "0")} 首已校准</span>
+          <span>{String(filteredSongs.length).padStart(2, "0")} SCORES PREPARED</span>
         </div>
 
         <div className="song-list">
@@ -72,7 +66,7 @@ export function SearchHome({ songs, onChoose }: SearchHomeProps) {
               className="song-row"
               key={song.id}
               type="button"
-              aria-label={`打开《${song.title}》`}
+              aria-label={`Open ${song.title}`}
               onClick={() => onChoose(song)}
             >
               <span className="song-index">{String(index + 1).padStart(2, "0")}</span>
@@ -80,7 +74,7 @@ export function SearchHome({ songs, onChoose }: SearchHomeProps) {
                 <strong>{song.title}</strong>
                 <small>{song.artist} · {song.version}</small>
               </span>
-              <span className="song-piano">{PIANO_NAMES[song.recommendedPiano]}</span>
+              <span className="song-piano">RECOMMENDED · {getPianoVoiceProfile(song.recommendedPiano).name}</span>
               <span className="song-duration">{song.durationLabel}</span>
               <span className="song-arrow" aria-hidden="true">↗</span>
             </button>
@@ -89,16 +83,16 @@ export function SearchHome({ songs, onChoose }: SearchHomeProps) {
 
         {filteredSongs.length === 0 && (
           <div className="empty-catalog" role="status">
-            <span aria-hidden="true">☾</span>
-            <p>这首歌还在月光之外。</p>
-            <small>首版先收录已人工校准的曲目。</small>
+            <span aria-hidden="true">○</span>
+            <p>That song is still beyond tonight&apos;s catalogue.</p>
+            <small>Try another title, artist, or lyric phrase.</small>
           </div>
         )}
       </section>
 
       <footer className="home-footer">
-        <span>用一排按键，留住一小段夜晚。</span>
-        <span>V1 · PRIVATE LISTENING ROOM</span>
+        <span>A little room for music after words.</span>
+        <span>PRIVATE LISTENING ROOM · SALAMANDER GRAND</span>
       </footer>
     </main>
   );

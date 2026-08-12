@@ -11,13 +11,22 @@ describe("SearchHome", () => {
     const onChoose = vi.fn();
     render(<SearchHome songs={builtinSongs} onChoose={onChoose} />);
 
-    expect(screen.getByRole("heading", { name: "今晚，想弹哪一首？" })).toBeInTheDocument();
-    await user.type(screen.getByRole("searchbox", { name: "搜索歌名" }), "星星");
+    expect(screen.getByRole("heading", { name: "Find your song" })).toBeInTheDocument();
+    await user.type(screen.getByRole("searchbox", { name: "Search songs" }), "星星");
 
-    expect(screen.getByText("小星星")).toBeInTheDocument();
-    expect(screen.queryByText("你好，月光")).not.toBeInTheDocument();
+    expect(screen.getByText("Twinkle, Twinkle, Little Star")).toBeInTheDocument();
+    expect(screen.queryByText("Hello, Moonlight")).not.toBeInTheDocument();
+    expect(screen.getByText("RECOMMENDED · Studio Grand")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /打开《小星星》/ }));
+    await user.click(screen.getByRole("button", { name: /Open Twinkle, Twinkle, Little Star/ }));
     expect(onChoose).toHaveBeenCalledWith(builtinSongs[1]);
+  });
+
+  it("keeps all visible interface copy in English", () => {
+    render(<SearchHome songs={builtinSongs} onChoose={vi.fn()} />);
+
+    expect(screen.getByText("MOONLIT RECORDS")).toBeInTheDocument();
+    expect(screen.getByText("A little room for music after words.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "The night's repertoire" })).toBeInTheDocument();
   });
 });

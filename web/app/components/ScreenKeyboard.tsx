@@ -13,10 +13,10 @@ interface ScreenKeyboardProps {
 
 export function ScreenKeyboard({ targetCode, feedback, pressedCodes }: ScreenKeyboardProps) {
   return (
-    <section className="keyboard-section" aria-label="电脑键盘演奏区">
+    <section className="keyboard-section" aria-label="Computer keyboard piano">
       <div className="keyboard-caption">
-        <span>你的键盘，就是琴键</span>
-        <span className="reserved-note"><i aria-hidden="true" />功能键留给浏览器与系统</span>
+        <span>A free piano, with lyric initials as your guide.</span>
+        <span className="reserved-note"><i aria-hidden="true" />System keys remain with your browser.</span>
       </div>
 
       <div className="screen-keyboard">
@@ -38,7 +38,7 @@ export function ScreenKeyboard({ targetCode, feedback, pressedCodes }: ScreenKey
                   style={{ "--key-width": item.width ?? 1 } as React.CSSProperties}
                   tabIndex={-1}
                   type="button"
-                  aria-label={`${item.label}${item.disabled ? "，不可用于演奏" : "键"}`}
+                  aria-label={`${item.label}${item.disabled ? ", reserved system key" : " piano key"}`}
                 >
                   <span>{item.label}</span>
                   {item.code === targetCode && <b aria-hidden="true" />}

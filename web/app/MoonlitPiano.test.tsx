@@ -12,6 +12,7 @@ describe("MoonlitPiano", () => {
       load: vi.fn().mockResolvedValue(undefined),
       resume: vi.fn().mockResolvedValue(undefined),
       setVoice: vi.fn(),
+      tailMs: vi.fn(() => 5900),
       attack: vi.fn(),
       release: vi.fn(),
       releaseAll: vi.fn(),
@@ -19,10 +20,10 @@ describe("MoonlitPiano", () => {
     };
     render(<MoonlitPiano piano={piano} />);
 
-    await user.type(screen.getByRole("searchbox", { name: "搜索歌名" }), "月光");
-    await user.click(screen.getByRole("button", { name: /打开《你好，月光》/ }));
+    await user.type(screen.getByRole("searchbox", { name: "Search songs" }), "月光");
+    await user.click(screen.getByRole("button", { name: /Open Hello, Moonlight/ }));
 
-    const enter = await screen.findByRole("button", { name: "打开琴盖，开始演奏" });
+    const enter = await screen.findByRole("button", { name: "Enter the performance" });
     expect(piano.load).toHaveBeenCalledOnce();
     await user.click(enter);
 

@@ -13,5 +13,7 @@ describe("LyricStage", () => {
     expect(screen.getByText("你", { selector: "[data-token-state='done']" })).toBeInTheDocument();
     expect(screen.getByText("好", { selector: "[data-token-state='current']" })).toBeInTheDocument();
     expect(screen.getByText("H", { selector: ".lyric-key" })).toBeInTheDocument();
+    expect(screen.getByText("NEXT LINE")).toBeInTheDocument();
+    expect(screen.getByText("你好，月光", { selector: ".lyric-line" })).toHaveAttribute("lang", "zh-CN");
   });
 });

@@ -23,6 +23,7 @@ export interface SongPackage {
   artist: string;
   version: string;
   searchAliases: string[];
+  lyricLanguage: "zh-CN" | "en";
   durationLabel: string;
   recommendedPiano: PianoVoice;
   phrases: Phrase[];

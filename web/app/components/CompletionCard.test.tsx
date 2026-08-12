@@ -15,8 +15,8 @@ describe("CompletionCard", () => {
     };
     render(<CompletionCard song={builtinSongs[0]} state={state} onAgain={vi.fn()} onCatalog={vi.fn()} />);
 
-    expect(screen.getByRole("heading", { name: "这一遍，属于你。" })).toBeInTheDocument();
-    expect(screen.getByText("8 个歌词音符")).toBeInTheDocument();
-    expect(screen.getByText("1 次自由试音")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "This performance was yours." })).toBeInTheDocument();
+    expect(screen.getByText("8 lyric notes")).toBeInTheDocument();
+    expect(screen.getByText("1 free-play note")).toBeInTheDocument();
   });
 });
