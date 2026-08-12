@@ -2,7 +2,7 @@
 
 ## Goal
 
-Long imported videos must run bounded, observable local transcription instead of immediately falling back because the entire recording was sent to the model at once. The performance view must state the duration of every note directly. Private imported arrangements must support rename and confirmed deletion from the catalogue.
+Long imported videos must run bounded, observable local transcription instead of immediately falling back because the entire recording was sent to the model at once. With Wi-Fi disconnected, the app must also extract approximate sung words locally and turn them into Chinese pinyin or English word-initial routes. The performance view must state the duration of every note directly. Private imported arrangements must support rename and confirmed deletion from the catalogue.
 
 ## Long-video Analysis
 
@@ -13,6 +13,14 @@ Segment-local timestamps are offset into whole-song time. Notes in the overlap a
 The duration of a grouped chord is the longest member duration, not latest end minus earliest start. This prevents an onset near the edge of the 80-millisecond chord window from turning a short note into a false hold.
 
 If a segment throws, the imported result may still use the PCM sketch, but the immediate result and catalogue both say `FALLBACK SKETCH`. The result never claims a neural transcription in that case.
+
+## Offline Lyric Recognition
+
+Transformers.js and the multilingual Whisper Tiny ONNX model are bundled under local static paths. Runtime configuration sets `allowRemoteModels` to false, enables local models, points `localModelPath` at `/models/`, and points ONNX Runtime WASM assets at `/wasm/`. Therefore neither model weights nor runtime binaries require internet access during import.
+
+Whisper receives locally decoded mono samples and uses its long-audio chunking. Its progress occupies the second half of the import bar after melody transcription. Plain recognized text is passed through the existing lyric mapper: Chinese characters become pinyin initials and English words use their first letter. If local speech recognition fails or returns too little stable text, the numeric melody arrangement remains playable and the record carries `LOCAL_LYRICS_UNAVAILABLE`; the UI explains that no local lyric line was recovered.
+
+Online enrichment is disabled for the import path. Filename metadata remains the offline title/artist source; the application does not pretend to identify a track title without a local fingerprint catalogue.
 
 ## Duration Guide
 
@@ -26,4 +34,4 @@ Only private imported rows receive a compact `Manage` control. `Rename` opens an
 
 ## Testing
 
-Pure tests cover 20-second segmentation, overlap offset/deduplication, bounded detector inputs, whole-song progress, chord duration, and monotonic analyzer progress. Rhythm guide tests assert explicit seconds and estimated fallback wording. Private library tests assert rename and removal, SearchHome tests cover the complete inline flows, and MoonlitPiano tests prove persistence callbacks update visible state. Full unit, type, lint, build, render, and local browser checks complete the change.
+Pure tests cover 20-second segmentation, overlap offset/deduplication, bounded detector inputs, whole-song progress, chord duration, offline Whisper configuration, lyric success/failure, and monotonic analyzer progress. Rhythm guide tests assert explicit seconds and estimated fallback wording. Private library tests assert rename and removal, SearchHome tests cover the complete inline flows, and MoonlitPiano tests prove persistence callbacks update visible state. Full unit, type, lint, build, render, offline asset, and local browser checks complete the change.

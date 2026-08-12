@@ -2,17 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make multi-minute model inference bounded and observable, expose every note duration, and add rename/delete controls for private arrangements.
+**Goal:** Make multi-minute melody and lyric inference fully offline, bounded, and observable; expose every note duration; and add rename/delete controls for private arrangements.
 
-**Architecture:** A pure chunk coordinator slices source PCM into overlapping windows and assembles detector results in whole-song time. Basic Pitch becomes one detector behind that coordinator. Existing player data drives clearer duration UI, while private-library mutations flow from SearchHome through MoonlitPiano into IndexedDB.
+**Architecture:** A pure chunk coordinator slices source PCM into overlapping windows and assembles detector results in whole-song time. Basic Pitch becomes one detector behind that coordinator. A locally bundled multilingual Whisper Tiny pipeline supplies approximate lyrics without remote requests, then the existing lyric mapper generates initial-key routes. Existing player data drives clearer duration UI, while private-library mutations flow from SearchHome through MoonlitPiano into IndexedDB.
 
-**Tech Stack:** React 19, TypeScript, Vitest, Testing Library, Spotify Basic Pitch, TensorFlow.js, IndexedDB, CSS.
+**Tech Stack:** React 19, TypeScript, Vitest, Testing Library, Spotify Basic Pitch, TensorFlow.js, Transformers.js, Whisper Tiny ONNX, IndexedDB, CSS.
 
 ## Global Constraints
 
 - Only `1`-`0` and `A`-`Z` are performance keys.
 - No key press means no piano sound and no performance advance.
 - Local neural transcription must use bounded memory for multi-minute media.
+- Runtime import analysis must make no remote model or enrichment request.
 - Fallback timing must be labelled estimated.
 - Rename and delete apply only to private imported arrangements.
 - Delete requires a second explicit click.
@@ -39,7 +40,30 @@
 - [ ] Map neural progress to 0.08-0.92, arranging to 0.94, enrichment to 0.96, and ready to 1.
 - [ ] Run both focused test files and commit.
 
-### Task 2: Explicit Duration Guide
+### Task 2: Fully Offline Approximate Lyrics
+
+**Files:**
+- Create: `web/app/import/local-whisper-transcriber.test.ts`
+- Create: `web/app/import/local-whisper-transcriber.ts`
+- Modify: `web/app/import/browser-media-analyzer.test.ts`
+- Modify: `web/app/import/browser-media-analyzer.ts`
+- Modify: `web/app/import/types.ts`
+- Modify: `web/app/components/ImportStudio.tsx`
+- Modify: `web/package.json`
+- Create: `web/public/models/whisper-tiny/*`
+- Create: `web/public/wasm/*`
+
+**Interfaces:**
+- Produces `transcribeLyricsLocally(input, onProgress): Promise<string>`.
+- Analyzer dependency `transcribeLyrics` allows deterministic tests.
+
+- [ ] Add failing tests proving remote models are disabled, local model/WASM paths are configured, recognized Chinese/English text creates letter routes, and missing speech leaves a playable numeric route with `LOCAL_LYRICS_UNAVAILABLE`.
+- [ ] Run focused tests and confirm expected failures.
+- [ ] Install Transformers.js, bundle multilingual Whisper Tiny quantized encoder/decoder plus tokenizer/config files and ONNX WASM assets, and implement the lazy local-only pipeline.
+- [ ] Remove online enrichment from ImportStudio and map melody/lyric progress monotonically across the full import.
+- [ ] Run focused tests and commit.
+
+### Task 3: Explicit Duration Guide
 
 **Files:**
 - Modify: `web/app/components/RhythmGuide.test.tsx`
@@ -57,7 +81,7 @@
 - [ ] Implement the copy, note-block secondary label, and fallback result badge.
 - [ ] Run the focused tests and commit.
 
-### Task 3: Private Arrangement Rename and Delete
+### Task 4: Private Arrangement Rename and Delete
 
 **Files:**
 - Modify: `web/app/import/private-library.test.ts`
@@ -79,7 +103,7 @@
 - [ ] Implement the library methods, parent mutations, accessible non-nested row controls, and elegant inline management states.
 - [ ] Run focused tests and commit.
 
-### Task 4: Verification
+### Task 5: Verification
 
 **Files:**
 - Modify only files required by failures directly caused by Tasks 1-3.
@@ -89,4 +113,5 @@
 - [ ] Run `npm run lint`.
 - [ ] Run `npm run test:render`.
 - [ ] In `http://localhost:3000/`, verify a multi-segment recording shows non-instant progress, explicit seconds appear, a private title persists after rename, and delete requires confirmation.
+- [ ] Verify all loaded model/runtime resource URLs are local and an offline speech fixture produces an initial-key route.
 - [ ] Commit verification fixes and keep the local page open.
