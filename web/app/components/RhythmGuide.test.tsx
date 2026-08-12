@@ -52,13 +52,39 @@ describe("RhythmGuide", () => {
     expect(screen.getByTestId("rhythm-event-0")).toHaveAttribute("data-duration-ms", "1200");
     expect(screen.getByTestId("rhythm-event-1")).toHaveAttribute("data-offset-ms", "800");
     expect(screen.getByTestId("rhythm-event-1")).toHaveAccessibleName("Next key 2, tap 0.3 seconds");
+    expect(screen.getByTestId("rhythm-event-1")).toHaveTextContent("2 0.3s");
   });
 
-  it("fills the current hold only while its physical key is down", () => {
+  it("shows an explicit duration for taps as well as holds", () => {
+    render(<RhythmGuide song={timedSong} eventIndex={1} pressedCodes={new Set()} />);
+    expect(screen.getByText("TAP 0.3s · 2")).toBeInTheDocument();
+    expect(screen.getByText("Every bar is an estimated duration from the printed score.")).toBeInTheDocument();
+  });
+
+  it("shows a silent countdown before exposing the next required key", () => {
+    render(
+      <RhythmGuide
+        song={timedSong}
+        eventIndex={1}
+        pressedCodes={new Set()}
+        restRemainingMs={850}
+      />,
+    );
+
+    expect(screen.getByText("REST 0.9s")).toBeInTheDocument();
+    expect(screen.getByText("No key is required until the rest completes.")).toBeInTheDocument();
+  });
+
+  it("drains the current duration bar only while its physical key is down", () => {
     const { rerender } = render(<RhythmGuide song={timedSong} eventIndex={0} pressedCodes={new Set()} />);
     expect(screen.getByTestId("rhythm-event-0")).toHaveAttribute("data-active", "false");
+    expect(screen.getByTestId("rhythm-event-0")).toHaveAttribute("data-countdown", "ready");
 
     rerender(<RhythmGuide song={timedSong} eventIndex={0} pressedCodes={new Set(["Digit1"])} />);
     expect(screen.getByTestId("rhythm-event-0")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("rhythm-event-0")).toHaveAttribute("data-countdown", "draining");
+    expect(screen.getByTestId("rhythm-event-0")).toHaveAccessibleName(
+      "Current key 1, hold 1.2 seconds; hold to drain the remaining bar",
+    );
   });
 });

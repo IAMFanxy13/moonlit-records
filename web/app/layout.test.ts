@@ -6,7 +6,7 @@ describe("site metadata", () => {
     const metadata = buildMetadata("https://moonlit.example");
 
     expect(metadata.title).toBe("Moonlit Records · Your Keyboard, in Concert");
-    expect(metadata.description).toContain("free piano");
+    expect(metadata.description).toContain("local piano");
     expect(metadata.openGraph).toEqual(expect.objectContaining({
       title: "Moonlit Records · Your Keyboard, in Concert",
       images: [expect.objectContaining({ url: "https://moonlit.example/og.png" })],

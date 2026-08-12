@@ -6,10 +6,10 @@ describe("import stages", () => {
   it("describes the truthful free processing sequence", () => {
     expect(IMPORT_STAGE_SEQUENCE).toEqual([
       "preparing",
-      "identifying",
-      "transcribing",
+      "rendering",
+      "recognizing",
+      "interpreting",
       "arranging",
-      "enriching",
       "ready",
     ]);
   });

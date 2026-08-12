@@ -2,62 +2,23 @@
 
 import { useRef, useState } from "react";
 
-import type { TrackEnrichment } from "../enrichment/types";
-import { analyzeMediaFile } from "../import/browser-media-analyzer";
-import { applyLyricsToSketch } from "../import/lyric-mapper";
+import { analyzeScoreFiles } from "../import/browser-score-analyzer";
 import { IMPORT_STAGE_LABELS, type ImportProgress, type PrivateSongRecord } from "../import/types";
 import type { SongPackage } from "../lib/song";
 
-type AnalyzeMedia = (
-  file: File,
+type AnalyzeScore = (
+  files: File[],
   onProgress: (progress: ImportProgress) => void,
 ) => Promise<PrivateSongRecord>;
 
-type EnrichRecord = (record: PrivateSongRecord, signal?: AbortSignal) => Promise<PrivateSongRecord>;
-
 interface ImportStudioProps {
-  analyze?: AnalyzeMedia;
-  enrich?: EnrichRecord;
-  enrichmentTimeoutMs?: number;
+  analyze?: AnalyzeScore;
   onImported: (record: PrivateSongRecord) => void;
   onPerform: (song: SongPackage) => void;
 }
 
-async function enrichFromFreeSources(record: PrivateSongRecord, signal?: AbortSignal): Promise<PrivateSongRecord> {
-  const query = new URLSearchParams({
-    title: record.metadata.title,
-    artist: record.metadata.artist,
-    durationMs: String(record.metadata.durationMs ?? 0),
-  });
-  const response = await fetch(`/api/enrich?${query}`, { signal });
-  if (!response.ok) throw new Error("Enrichment unavailable");
-  const enrichment = await response.json() as TrackEnrichment;
-  const metadata = {
-    ...record.metadata,
-    title: enrichment.fields.title?.value ?? record.metadata.title,
-    artist: enrichment.fields.artist?.value ?? record.metadata.artist,
-    album: enrichment.fields.album?.value ?? record.metadata.album,
-    coverUrl: enrichment.fields.coverUrl?.value ?? record.metadata.coverUrl,
-  };
-  let song = {
-    ...record.song,
-    title: metadata.title,
-    artist: metadata.artist,
-  };
-  const lyricText = enrichment.lyrics?.plain;
-  if (lyricText) song = applyLyricsToSketch(song, lyricText);
-  return {
-    ...record,
-    metadata,
-    song,
-    warnings: [...record.warnings, ...enrichment.warnings],
-  };
-}
-
 export function ImportStudio({
-  analyze = analyzeMediaFile,
-  enrich = enrichFromFreeSources,
-  enrichmentTimeoutMs = 6000,
+  analyze = analyzeScoreFiles,
   onImported,
   onPerform,
 }: ImportStudioProps) {
@@ -65,39 +26,20 @@ export function ImportStudio({
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [record, setRecord] = useState<PrivateSongRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [onlineWarning, setOnlineWarning] = useState(false);
   const [dragging, setDragging] = useState(false);
 
-  const importFile = async (file?: File) => {
-    if (!file) return;
+  const importFiles = async (files: File[]) => {
+    if (files.length === 0) return;
     setError(null);
     setRecord(null);
-    setOnlineWarning(false);
     try {
-      const localRecord = await analyze(file, setProgress);
-      let finalRecord = localRecord;
-      setProgress({ stage: "enriching", detail: "Checking free metadata and lyric sources; the local arrangement is already safe.", fraction: 0.96, method: "online" });
-      const controller = new AbortController();
-      let enrichmentTimer: number | null = null;
-      try {
-        const timedOut = new Promise<never>((_resolve, reject) => {
-          enrichmentTimer = window.setTimeout(() => {
-            controller.abort();
-            reject(new Error("Optional online enrichment timed out."));
-          }, enrichmentTimeoutMs);
-        });
-        finalRecord = await Promise.race([enrich(localRecord, controller.signal), timedOut]);
-      } catch {
-        setOnlineWarning(true);
-      } finally {
-        if (enrichmentTimer !== null) window.clearTimeout(enrichmentTimer);
-      }
-      setProgress({ stage: "ready", detail: "Your private piano arrangement is ready.", fraction: 1 });
+      const finalRecord = await analyze(files, setProgress);
+      setProgress({ stage: "ready", detail: "Your private piano score is ready.", fraction: 1 });
       setRecord(finalRecord);
       onImported(finalRecord);
     } catch (reason) {
       setProgress(null);
-      setError(reason instanceof Error ? reason.message : "This recording could not be prepared.");
+      setError(reason instanceof Error ? reason.message : "This score could not be prepared.");
     }
   };
 
@@ -105,10 +47,10 @@ export function ImportStudio({
 
   return (
     <section className="import-studio" aria-labelledby="import-title">
-      <p className="eyebrow">PRIVATE ARRANGEMENT STUDIO</p>
-      <h1 id="import-title">Bring your own recording</h1>
+      <p className="eyebrow">PRIVATE SCORE ATELIER</p>
+      <h1 id="import-title">Bring your numbered score</h1>
       <p className="import-intro">
-        Audio or video becomes a piano path you perform yourself. No VIP stream, no paid API, no automatic backing track.
+        Add one or more lyric-bearing Jianpu images, or a PDF. A bundled local reader turns the printed score into a piano path you perform yourself.
       </p>
 
       <button
@@ -123,13 +65,13 @@ export function ImportStudio({
         onDrop={(event) => {
           event.preventDefault();
           setDragging(false);
-          void importFile(event.dataTransfer.files[0]);
+          void importFiles(Array.from(event.dataTransfer.files));
         }}
       >
         <span className="import-monogram" aria-hidden="true">＋</span>
         <span>
-          <strong>{busy ? "Preparing your arrangement" : "Import audio or video"}</strong>
-          <small>MP3 · WAV · FLAC · M4A · OGG · MP4 · MOV · WEBM</small>
+          <strong>{busy ? "Reading your printed score" : "Import score images or PDF"}</strong>
+          <small>PNG · JPEG · WEBP · PDF · MULTIPLE PAGES WELCOME</small>
         </span>
         <i aria-hidden="true">BROWSE</i>
       </button>
@@ -137,22 +79,23 @@ export function ImportStudio({
         ref={picker}
         className="sr-only"
         type="file"
-        accept="audio/*,video/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.mp4,.mov,.webm"
-        aria-label="Choose audio or video"
+        multiple
+        accept="image/png,image/jpeg,image/webp,application/pdf,.png,.jpg,.jpeg,.webp,.pdf"
+        aria-label="Choose score images or PDF"
         onChange={(event) => {
-          void importFile(event.target.files?.[0]);
+          void importFiles(Array.from(event.target.files ?? []));
           event.target.value = "";
         }}
       />
 
-      <p className="import-privacy">NO SUBSCRIPTION · NO PAID API · YOUR FILE STAYS PRIVATE</p>
+      <p className="import-privacy">NO WI-FI REQUIRED · NO SUBSCRIPTION · YOUR PAGES STAY PRIVATE</p>
 
       {busy && progress && (
         <div className="import-progress" role="status">
           <span>{IMPORT_STAGE_LABELS[progress.stage]}</span>
           <i
             role="progressbar"
-            aria-label="Local analysis progress"
+            aria-label="Local score recognition progress"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round((progress.fraction ?? 0) * 100)}
@@ -170,10 +113,14 @@ export function ImportStudio({
           <span>READY TO PERFORM</span>
           <div>
             <strong>{record.song.title}</strong>
-            <small>{record.song.artist} · {record.song.quality.toUpperCase()} ARRANGEMENT</small>
+            <small>
+              {record.song.artist} · {record.song.quality === "sketch" ? "ESTIMATED SCORE" : "LOCAL SCORE RECOGNITION"}
+            </small>
           </div>
-          {onlineWarning && <p>Online details were unavailable; your private local arrangement is still complete.</p>}
-          <button type="button" onClick={() => onPerform(record.song)}>Perform this arrangement</button>
+          {record.warnings.length > 0 && (
+            <p>Unclear marks were resolved with conservative musical estimates; the result remains fully playable.</p>
+          )}
+          <button type="button" onClick={() => onPerform(record.song)}>Perform this score</button>
         </div>
       )}
     </section>

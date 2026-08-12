@@ -12,6 +12,14 @@ An English-first, lyric-guided concert piano that turns a standard computer keyb
 - Hold a physical key to sustain its exact note and release that same key to begin the natural envelope. Independent held keys form real chords.
 - Continue improvising after the final lyric note. Completion waits until every held key is released and the selected hall tail has fully faded.
 
+## Printed-score atelier
+
+- Import one or more lyric-bearing Jianpu images (`PNG`, `JPEG`, `WEBP`) or a multi-page `PDF`.
+- Recognition runs entirely in the browser with bundled PaddleOCR, ONNX Runtime Web and PDF.js assets. No account, subscription or network connection is required.
+- A deterministic Jianpu compiler keeps every recognizable note even when part of a page is uncertain, derives lyric initials, and labels best-effort arrangements as estimated.
+- A note highway shows the next key, its literal hold length and silent rests. Tempo can be changed from 50–120 BPM without changing pitch.
+- Private imported scores can be renamed or permanently deleted from the repertoire.
+
 ## Piano voices
 
 Moonlit Records recommends a voice per arrangement while keeping all four available during performance:
@@ -40,10 +48,8 @@ npm run test:render
 npm run build
 ```
 
-## Audio and rights
+## Audio, recognition and rights
 
 The piano samples come from Salamander Grand Piano under CC BY 3.0; see `public/audio/ATTRIBUTION.md`. The included score fragments are original material or manually calibrated public-domain melodies. The application does not scrape or hotlink copyrighted lyrics or audio.
 
-## Deployment
-
-The site is configured for a private OpenAI Sites project in `.openai/hosting.json`. Publishing replaces the current private version without changing the project identity.
+PaddleOCR is Apache-2.0 licensed, PDF.js is Apache-2.0 licensed, and ONNX Runtime is MIT licensed. Their browser runtime and model assets are stored locally under `public/ocr` and `public/pdf`.

@@ -68,7 +68,7 @@ describe("PlayerShell", () => {
     );
 
     expect(screen.getByLabelText("Rhythm guide")).toBeInTheDocument();
-    expect(screen.getByText(/TAP · N/u)).toBeInTheDocument();
+    expect(screen.getByText(/TAP 0\.2s · N/u)).toBeInTheDocument();
   });
 
   it("holds each attacked note until its own keyup and supports chords", () => {
@@ -210,5 +210,40 @@ describe("PlayerShell", () => {
     fireEvent.keyUp(window, { code: "KeyN", key: "n", timeStamp: 200 });
     expect(screen.getByText("0 / 1")).toBeInTheDocument();
     expect(screen.getByText(/Release was early/)).toBeInTheDocument();
+  });
+
+  it("rescales the highway with tempo and keeps a printed rest silent", () => {
+    const piano = fakePiano();
+    const base = builtinSongs[0];
+    const restedSong = {
+      ...base,
+      tempoBpm: 72,
+      phrases: [{ id: "rested", text: "Night", startEvent: 0, endEvent: 0 }],
+      events: [{
+        ...base.events[0],
+        kind: "hold" as const,
+        holdMs: 1_000,
+        restBeforeMs: 1_000,
+        sourceStartMs: 1_000,
+        sourceEndMs: 2_000,
+      }],
+    };
+    render(<PlayerShell song={restedSong} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    expect(screen.getByRole("slider", { name: "Tempo" })).toHaveValue("72");
+    expect(screen.getByText("REST 1.0s")).toBeInTheDocument();
+    expect(screen.getByTestId("key-KeyN")).not.toHaveAttribute("data-state", "target");
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    expect(screen.getByText("0 / 1")).toBeInTheDocument();
+    expect(piano.attack).toHaveBeenCalledWith([expect.any(String)], 78);
+    fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "target");
+
+    fireEvent.change(screen.getByRole("slider", { name: "Tempo" }), { target: { value: "60" } });
+    expect(screen.getByText("60 BPM")).toBeInTheDocument();
+    expect(screen.getByText("HOLD 1.2s · N")).toBeInTheDocument();
   });
 });

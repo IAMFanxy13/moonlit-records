@@ -52,6 +52,30 @@ export function MoonlitPiano({ piano: injectedPiano, privateLibrary: injectedLib
     });
   };
 
+  const renamePrivateSong = async (record: PrivateSongRecord, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    const updated: PrivateSongRecord = {
+      ...record,
+      metadata: { ...record.metadata, title: trimmed },
+      song: { ...record.song, title: trimmed },
+    };
+    try {
+      const stored = await privateLibrary.put(updated);
+      setPrivateRecords((current) => current.map((item) => item.id === stored.id ? stored : item));
+    } catch {
+      setPrivateRecords((current) => current.map((item) => item.id === updated.id ? updated : item));
+    }
+  };
+
+  const deletePrivateSong = async (record: PrivateSongRecord) => {
+    try {
+      await privateLibrary.remove(record.id);
+    } finally {
+      setPrivateRecords((current) => current.filter((item) => item.id !== record.id));
+    }
+  };
+
   const chooseSong = async (song: SongPackage) => {
     const request = ++loadRequest.current;
     setSelectedSong(song);
@@ -87,8 +111,10 @@ export function MoonlitPiano({ piano: injectedPiano, privateLibrary: injectedLib
     return (
       <SearchHome
         songs={builtinSongs}
-        privateSongs={privateRecords.map((record) => record.song)}
+        privateRecords={privateRecords}
         onImported={rememberImportedSong}
+        onRenamePrivate={renamePrivateSong}
+        onDeletePrivate={deletePrivateSong}
         onChoose={chooseSong}
       />
     );

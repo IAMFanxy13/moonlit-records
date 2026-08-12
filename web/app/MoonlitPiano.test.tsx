@@ -50,4 +50,35 @@ describe("MoonlitPiano", () => {
 
     expect(await screen.findByRole("button", { name: "Open Saved Arrangement" })).toBeInTheDocument();
   });
+
+  it("persists private arrangement renames and confirmed deletion", async () => {
+    const user = userEvent.setup();
+    const saved: PrivateSongRecord = {
+      id: "import-editable",
+      checksum: "editable",
+      sourceName: "Editable.mp4",
+      createdAt: "2026-08-12T00:00:00.000Z",
+      metadata: { title: "Editable Arrangement", artist: "Private Artist" },
+      song: { ...builtinSongs[2], id: "import-editable", title: "Editable Arrangement", artist: "Private Artist" },
+      warnings: [],
+    };
+    const library = createMemoryPrivateLibrary([saved]);
+    render(<MoonlitPiano privateLibrary={library} />);
+
+    await user.click(await screen.findByRole("button", { name: "Manage Editable Arrangement" }));
+    await user.click(screen.getByRole("button", { name: "Rename" }));
+    const input = screen.getByRole("textbox", { name: "Rename Editable Arrangement" });
+    await user.clear(input);
+    await user.type(input, "Moon Room");
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+    expect(await screen.findByRole("button", { name: "Open Moon Room" })).toBeInTheDocument();
+    expect((await library.get(saved.id))?.metadata.title).toBe("Moon Room");
+    expect((await library.get(saved.id))?.song.title).toBe("Moon Room");
+
+    await user.click(screen.getByRole("button", { name: "Manage Moon Room" }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Delete forever" }));
+    expect(screen.queryByRole("button", { name: "Open Moon Room" })).not.toBeInTheDocument();
+    expect(await library.get(saved.id)).toBeNull();
+  });
 });

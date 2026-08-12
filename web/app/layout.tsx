@@ -4,7 +4,7 @@ import "./globals.css";
 export function buildMetadata(origin: string): Metadata {
   const normalizedOrigin = origin.replace(/\/$/, "");
   const title = "Moonlit Records · Your Keyboard, in Concert";
-  const description = "A free piano with lyric-initial guidance, expressive sampled voices, and a concert-hall tail that stays until the final resonance fades.";
+  const description = "A private local piano that turns lyric-bearing Jianpu images or PDFs into expressive keyboard performances.";
 
   return {
     title,
@@ -30,7 +30,7 @@ export function buildMetadata(origin: string): Metadata {
 }
 
 export const metadata = buildMetadata(
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://moonlit-records-piano.nieqingcao-stu1.chatgpt.site",
+  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 );
 
 export default function RootLayout({

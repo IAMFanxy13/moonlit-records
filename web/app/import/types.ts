@@ -2,27 +2,27 @@ import type { SongPackage } from "../lib/song";
 
 export type ImportStage =
   | "preparing"
-  | "identifying"
-  | "transcribing"
+  | "rendering"
+  | "recognizing"
+  | "interpreting"
   | "arranging"
-  | "enriching"
   | "ready";
 
 export const IMPORT_STAGE_SEQUENCE: readonly ImportStage[] = [
   "preparing",
-  "identifying",
-  "transcribing",
+  "rendering",
+  "recognizing",
+  "interpreting",
   "arranging",
-  "enriching",
   "ready",
 ];
 
 export const IMPORT_STAGE_LABELS: Record<ImportStage, string> = {
-  preparing: "PREPARING THE RECORDING",
-  identifying: "IDENTIFYING THE SONG",
-  transcribing: "TRANSCRIBING NOTES ON THIS DEVICE",
+  preparing: "CHECKING THE SCORE",
+  rendering: "PREPARING EVERY PAGE",
+  recognizing: "READING NOTATION & LYRICS LOCALLY",
+  interpreting: "INTERPRETING JIANPU MARKS",
   arranging: "ARRANGING FOR PIANO",
-  enriching: "CHECKING FREE SONG DETAILS",
   ready: "READY TO PERFORM",
 };
 
@@ -30,7 +30,7 @@ export interface ImportProgress {
   stage: ImportStage;
   detail: string;
   fraction?: number;
-  method?: "neural" | "fallback" | "online";
+  method?: "neural" | "fallback";
 }
 
 export interface ImportedMetadata {
@@ -51,23 +51,6 @@ export interface EnrichedField<T> {
   persistence: "allowed" | "session-only";
 }
 
-export interface AnalysisEventEvidence {
-  startMs: number;
-  durationMs: number;
-  notes: string[];
-  velocity: number;
-  confidence: number;
-}
-
-export interface AnalysisEvidence {
-  durationMs: number;
-  tempo?: number;
-  musicalKey?: string;
-  events: AnalysisEventEvidence[];
-  warnings: string[];
-  quality: "clear" | "usable" | "sketch";
-}
-
 export interface PrivateSongRecord {
   id: string;
   checksum: string;
@@ -78,12 +61,17 @@ export interface PrivateSongRecord {
   warnings: string[];
 }
 
-export class ImportMediaError extends Error {
+export class ImportScoreError extends Error {
   constructor(
-    readonly code: "UNSUPPORTED_MEDIA" | "NO_AUDIBLE_AUDIO" | "FILE_TOO_LARGE" | "MEDIA_TOO_LONG",
+    readonly code:
+      | "UNSUPPORTED_SCORE"
+      | "NO_SCORE_PAGES"
+      | "FILE_TOO_LARGE"
+      | "PAGE_LIMIT"
+      | "NO_JIANPU",
     message: string,
   ) {
     super(message);
-    this.name = "ImportMediaError";
+    this.name = "ImportScoreError";
   }
 }

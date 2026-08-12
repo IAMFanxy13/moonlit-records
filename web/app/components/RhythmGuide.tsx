@@ -11,6 +11,7 @@ interface RhythmGuideProps {
   song: SongPackage;
   eventIndex: number;
   pressedCodes: ReadonlySet<string>;
+  restRemainingMs?: number;
 }
 
 interface RhythmStyle extends CSSProperties {
@@ -36,10 +37,10 @@ function offsetFor(current: SongEvent, event: SongEvent, ordinal: number): numbe
 }
 
 function secondsLabel(durationMs: number): string {
-  return (durationMs / 1000).toFixed(1);
+  return (Math.round(durationMs / 100) / 10).toFixed(1);
 }
 
-export function RhythmGuide({ song, eventIndex, pressedCodes }: RhythmGuideProps) {
+export function RhythmGuide({ song, eventIndex, pressedCodes, restRemainingMs = 0 }: RhythmGuideProps) {
   const current = song.events[eventIndex];
   if (!current) return null;
 
@@ -48,16 +49,26 @@ export function RhythmGuide({ song, eventIndex, pressedCodes }: RhythmGuideProps
   const visible = song.events.slice(eventIndex, eventIndex + VISIBLE_EVENTS);
   const currentDuration = durationFor(current);
   const currentLabel = labelForCode(current.targetCode);
-  const instruction = current.kind === "hold"
-    ? `HOLD ${secondsLabel(currentDuration)}s · ${currentLabel}`
-    : `TAP · ${currentLabel}`;
+  const resting = restRemainingMs > 0;
+  const instruction = resting
+    ? `REST ${secondsLabel(restRemainingMs)}s`
+    : `${current.kind === "hold" ? "HOLD" : "TAP"} ${secondsLabel(currentDuration)}s · ${currentLabel}`;
 
   return (
-    <section className="rhythm-guide" aria-label="Rhythm guide" data-lane-mode={digitMode ? "digits" : "letters"}>
+    <section
+      className="rhythm-guide"
+      aria-label="Rhythm guide"
+      data-lane-mode={digitMode ? "digits" : "letters"}
+      data-resting={resting}
+    >
       <header className="rhythm-caption">
         <span>NOTE HIGHWAY</span>
         <strong>{instruction}</strong>
-        <small>Length is literal — hold until the bar completes.</small>
+        <small>
+          {resting
+            ? "No key is required until the rest completes."
+            : "Every bar is an estimated duration from the printed score."}
+        </small>
       </header>
       <div className="rhythm-track">
         <div className="rhythm-lanes" aria-hidden="true">
@@ -88,13 +99,14 @@ export function RhythmGuide({ song, eventIndex, pressedCodes }: RhythmGuideProps
               data-testid={`rhythm-event-${eventIndex + ordinal}`}
               data-current={isCurrent}
               data-active={active}
+              data-countdown={isCurrent ? (active ? "draining" : "ready") : "queued"}
               data-kind={event.kind}
               data-duration-ms={durationMs}
               data-offset-ms={offsetMs}
-              aria-label={`${isCurrent ? "Current" : "Next"} key ${label}, ${timing}`}
+              aria-label={`${isCurrent ? "Current" : "Next"} key ${label}, ${timing}${isCurrent ? "; hold to drain the remaining bar" : ""}`}
             >
               <i aria-hidden="true" />
-              <b>{label}</b>
+              <b>{label}{" "}<small>{secondsLabel(durationMs)}s</small></b>
             </span>
           );
         })}
