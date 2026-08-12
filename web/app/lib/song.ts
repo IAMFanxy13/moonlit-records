@@ -1,13 +1,23 @@
 export type PianoVoice = "warm" | "concert" | "bright" | "upright";
 
+export type ArrangementQuality = "clear" | "usable" | "sketch";
+
 export interface SongEvent {
   id: string;
   phraseIndex: number;
-  tokenIndex: number;
-  token: string;
+  tokenIndex: number | null;
+  token: string | null;
   targetCode: string;
+  notes: string[];
+  /** @deprecated Read `notes`; retained while calibrated V1 packages migrate. */
   note: string;
   velocity: number;
+  kind: "tap" | "hold";
+  holdMs?: number;
+  sourceStartMs?: number;
+  sourceEndMs?: number;
+  confidence: number;
+  provenance: string[];
 }
 
 export interface Phrase {
@@ -26,6 +36,8 @@ export interface SongPackage {
   lyricLanguage: "zh-CN" | "en";
   durationLabel: string;
   recommendedPiano: PianoVoice;
+  quality: ArrangementQuality;
+  provenance: string[];
   phrases: Phrase[];
   events: SongEvent[];
 }

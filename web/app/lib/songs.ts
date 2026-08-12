@@ -14,8 +14,12 @@ function lyricEvents(
     tokenIndex,
     token,
     targetCode: targetCodes[tokenIndex],
+    notes: [notes[tokenIndex]],
     note: notes[tokenIndex],
     velocity: 92,
+    kind: "tap" as const,
+    confidence: 1,
+    provenance: ["curated"],
   }));
 }
 
@@ -55,26 +59,55 @@ const twinkleEvents = [
     ["F4", "F4", "E4", "E4", "D4", "D4", "C4"],
     7,
   ),
+  ...lyricEvents(
+    "little-star",
+    2,
+    ["挂", "在", "天", "上", "放", "光", "明"],
+    ["KeyG", "KeyZ", "KeyT", "KeyS", "KeyF", "KeyG", "KeyM"],
+    ["G4", "G4", "F4", "F4", "E4", "E4", "D4"],
+    14,
+  ),
+  ...lyricEvents(
+    "little-star",
+    3,
+    ["好", "像", "许", "多", "小", "眼", "睛"],
+    ["KeyH", "KeyX", "KeyX", "KeyD", "KeyX", "KeyY", "KeyJ"],
+    ["G4", "G4", "F4", "F4", "E4", "E4", "D4"],
+    21,
+  ),
+  ...lyricEvents(
+    "little-star",
+    4,
+    ["一", "闪", "一", "闪", "亮", "晶", "晶"],
+    ["KeyY", "KeyS", "KeyY", "KeyS", "KeyL", "KeyJ", "KeyJ"],
+    ["C4", "C4", "G4", "G4", "A4", "A4", "G4"],
+    28,
+  ),
+  ...lyricEvents(
+    "little-star",
+    5,
+    ["满", "天", "都", "是", "小", "星", "星"],
+    ["KeyM", "KeyT", "KeyD", "KeyS", "KeyX", "KeyX", "KeyX"],
+    ["F4", "F4", "E4", "E4", "D4", "D4", "C4"],
+    35,
+  ),
 ];
 
-const odeEvents = [
-  ...lyricEvents(
-    "ode-to-joy",
-    0,
-    ["♪", "♪", "♪", "♪"],
-    ["Space", "Space", "Space", "Space"],
-    ["E4", "E4", "F4", "G4"],
-    0,
-  ),
-  ...lyricEvents(
-    "ode-to-joy",
-    1,
-    ["♪", "♪", "♪", "♪"],
-    ["Space", "Space", "Space", "Space"],
-    ["G4", "F4", "E4", "D4"],
-    4,
-  ),
-];
+const odeNotes = ["E4", "E4", "F4", "G4", "G4", "F4", "E4", "D4"];
+const odeTargets = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8"];
+const odeEvents: SongEvent[] = odeNotes.map((note, index) => ({
+  id: `ode-to-joy-${index}`,
+  phraseIndex: index < 4 ? 0 : 1,
+  tokenIndex: null,
+  token: null,
+  targetCode: odeTargets[index],
+  notes: [note],
+  note,
+  velocity: 92,
+  kind: "tap",
+  confidence: 1,
+  provenance: ["curated"],
+}));
 
 export const builtinSongs: SongPackage[] = [
   {
@@ -86,6 +119,8 @@ export const builtinSongs: SongPackage[] = [
     lyricLanguage: "zh-CN",
     durationLabel: "00:28",
     recommendedPiano: "warm",
+    quality: "clear",
+    provenance: ["curated"],
     phrases: [
       { id: "moon-0", text: "你好，月光", startEvent: 0, endEvent: 3 },
       { id: "moon-1", text: "照进心里", startEvent: 4, endEvent: 7 },
@@ -99,11 +134,17 @@ export const builtinSongs: SongPackage[] = [
     version: "Public-domain Lullaby",
     searchAliases: ["小星星", "一闪一闪亮晶晶", "佚名", "童谣"],
     lyricLanguage: "zh-CN",
-    durationLabel: "00:46",
+    durationLabel: "01:12",
     recommendedPiano: "bright",
+    quality: "clear",
+    provenance: ["public-domain-melody", "curated"],
     phrases: [
       { id: "star-0", text: "一闪一闪亮晶晶", startEvent: 0, endEvent: 6 },
       { id: "star-1", text: "满天都是小星星", startEvent: 7, endEvent: 13 },
+      { id: "star-2", text: "挂在天上放光明", startEvent: 14, endEvent: 20 },
+      { id: "star-3", text: "好像许多小眼睛", startEvent: 21, endEvent: 27 },
+      { id: "star-4", text: "一闪一闪亮晶晶", startEvent: 28, endEvent: 34 },
+      { id: "star-5", text: "满天都是小星星", startEvent: 35, endEvent: 41 },
     ],
     events: twinkleEvents,
   },
@@ -116,6 +157,8 @@ export const builtinSongs: SongPackage[] = [
     lyricLanguage: "zh-CN",
     durationLabel: "00:24",
     recommendedPiano: "concert",
+    quality: "clear",
+    provenance: ["public-domain-melody", "curated"],
     phrases: [
       { id: "ode-0", text: "♪  无词旋律", startEvent: 0, endEvent: 3 },
       { id: "ode-1", text: "♪  继续呼吸", startEvent: 4, endEvent: 7 },
