@@ -10,7 +10,6 @@ const VISIBLE_EVENTS = 8;
 interface RhythmGuideProps {
   song: SongPackage;
   eventIndex: number;
-  pressedCodes: ReadonlySet<string>;
   restRemainingMs?: number;
 }
 
@@ -18,6 +17,10 @@ interface RhythmStyle extends CSSProperties {
   "--rhythm-left": string;
   "--rhythm-bottom": string;
   "--rhythm-height": string;
+  "--rhythm-hold-ms": string;
+}
+
+interface SharedDurationStyle extends CSSProperties {
   "--rhythm-hold-ms": string;
 }
 
@@ -40,7 +43,43 @@ function secondsLabel(durationMs: number): string {
   return (Math.round(durationMs / 100) / 10).toFixed(1);
 }
 
-export function RhythmGuide({ song, eventIndex, pressedCodes, restRemainingMs = 0 }: RhythmGuideProps) {
+interface SharedDurationBarProps {
+  event: SongEvent;
+  active: boolean;
+  resting: boolean;
+}
+
+export function SharedDurationBar({ event, active, resting }: SharedDurationBarProps) {
+  const durationMs = durationFor(event);
+  const label = labelForCode(event.targetCode);
+  const countdown = resting ? "resting" : active ? "draining" : "ready";
+  const style: SharedDurationStyle = { "--rhythm-hold-ms": `${durationMs}ms` };
+
+  return (
+    <section
+      className="shared-duration-guide"
+      data-testid="shared-duration-bar"
+      data-countdown={countdown}
+      data-event-id={event.id}
+      aria-label={`Shared duration guide for key ${label}, ${secondsLabel(durationMs)} seconds`}
+      style={style}
+    >
+      <div className="shared-duration-copy">
+        <span>DURATION GUIDE</span>
+        <strong>{resting ? "REST" : label}</strong>
+      </div>
+      <div className="shared-duration-track" aria-hidden="true">
+        <i />
+      </div>
+      <div className="shared-duration-time">
+        <strong>{secondsLabel(durationMs)}s</strong>
+        <span>{resting ? "WAIT" : active ? "HOLDING" : "PRESS TO START"}</span>
+      </div>
+    </section>
+  );
+}
+
+export function RhythmGuide({ song, eventIndex, restRemainingMs = 0 }: RhythmGuideProps) {
   const current = song.events[eventIndex];
   if (!current) return null;
 
@@ -52,7 +91,7 @@ export function RhythmGuide({ song, eventIndex, pressedCodes, restRemainingMs = 
   const resting = restRemainingMs > 0;
   const instruction = resting
     ? `REST ${secondsLabel(restRemainingMs)}s`
-    : `${current.kind === "hold" ? "HOLD" : "TAP"} ${secondsLabel(currentDuration)}s · ${currentLabel}`;
+    : `GUIDE ${secondsLabel(currentDuration)}s · ${currentLabel}`;
 
   return (
     <section
@@ -66,8 +105,8 @@ export function RhythmGuide({ song, eventIndex, pressedCodes, restRemainingMs = 
         <strong>{instruction}</strong>
         <small>
           {resting
-            ? "No key is required until the rest completes."
-            : "Every bar is an estimated duration from the printed score."}
+            ? "No key is suggested until the rest completes."
+            : "Hold to drain the bar; release whenever you choose."}
         </small>
       </header>
       <div className="rhythm-track">
@@ -82,9 +121,8 @@ export function RhythmGuide({ song, eventIndex, pressedCodes, restRemainingMs = 
           const durationMs = durationFor(event);
           const offsetMs = offsetFor(current, event, ordinal);
           const isCurrent = ordinal === 0;
-          const active = isCurrent && pressedCodes.has(event.targetCode);
           const label = labelForCode(event.targetCode);
-          const timing = event.kind === "hold" ? `hold ${secondsLabel(durationMs)} seconds` : `tap ${secondsLabel(durationMs)} seconds`;
+          const timing = `suggested hold ${secondsLabel(durationMs)} seconds`;
           const style: RhythmStyle = {
             "--rhythm-left": `${((laneIndex + 0.5) / lanes.length) * 100}%`,
             "--rhythm-bottom": `${12 + Math.min(82, offsetMs / 42)}px`,
@@ -98,12 +136,10 @@ export function RhythmGuide({ song, eventIndex, pressedCodes, restRemainingMs = 
               style={style}
               data-testid={`rhythm-event-${eventIndex + ordinal}`}
               data-current={isCurrent}
-              data-active={active}
-              data-countdown={isCurrent ? (active ? "draining" : "ready") : "queued"}
               data-kind={event.kind}
               data-duration-ms={durationMs}
               data-offset-ms={offsetMs}
-              aria-label={`${isCurrent ? "Current" : "Next"} key ${label}, ${timing}${isCurrent ? "; hold to drain the remaining bar" : ""}`}
+              aria-label={`${isCurrent ? "Current" : "Next"} key ${label}, ${timing}`}
             >
               <i aria-hidden="true" />
               <b>{label}{" "}<small>{secondsLabel(durationMs)}s</small></b>

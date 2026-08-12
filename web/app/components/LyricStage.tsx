@@ -7,11 +7,12 @@ interface LyricStageProps {
 }
 
 const INSTRUMENTAL_ROUTE_LENGTH = 10;
+const LYRIC_UNIT = /\p{Script=Han}|[A-Za-z]+(?:'[A-Za-z]+)?|[^\p{Script=Han}A-Za-z]+/gu;
+const PLAYABLE_LYRIC_UNIT = /^(?:\p{Script=Han}|[A-Za-z]+(?:'[A-Za-z]+)?)$/u;
 
 export function LyricStage({ song, eventIndex }: LyricStageProps) {
   const safeEventIndex = Math.min(eventIndex, Math.max(song.events.length - 1, 0));
-  const currentEvent = song.events[safeEventIndex];
-  const currentPhraseIndex = currentEvent?.phraseIndex ?? song.phrases.length - 1;
+  const currentPhraseIndex = song.events[safeEventIndex]?.phraseIndex ?? song.phrases.length - 1;
   const currentPhrase = song.phrases[currentPhraseIndex];
   const nextPhrase = song.phrases[currentPhraseIndex + 1];
   const phraseEvents = song.events.slice(currentPhrase.startEvent, currentPhrase.endEvent + 1);
@@ -43,21 +44,24 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
       });
     });
   } else {
-    Array.from(currentPhrase.text).forEach((character, characterIndex) => {
-      const event = phraseEvents[eventOffset];
-      if (
-        event &&
-        typeof event.token === "string" &&
-        (event.token === character || event.token.startsWith(character))
+    const units = currentPhrase.text.match(LYRIC_UNIT) ?? [];
+    units.forEach((unit, unitIndex) => {
+      let matched = false;
+      while (
+        PLAYABLE_LYRIC_UNIT.test(unit) &&
+        phraseEvents[eventOffset]?.token === unit
       ) {
+        const event = phraseEvents[eventOffset];
         lyricPieces.push({
           id: event.id,
-          text: character,
+          text: unit,
           absoluteIndex: currentPhrase.startEvent + eventOffset,
         });
         eventOffset += 1;
-      } else {
-        lyricPieces.push({ id: `${currentPhrase.id}-punctuation-${characterIndex}`, text: character });
+        matched = true;
+      }
+      if (!matched) {
+        lyricPieces.push({ id: `${currentPhrase.id}-punctuation-${unitIndex}`, text: unit });
       }
     });
     phraseEvents.slice(eventOffset).forEach((event, remainingIndex) => {
@@ -102,16 +106,6 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
             );
           })}
         </div>
-        {currentEvent?.kind === "hold" && (
-          <div
-            className="hold-rail"
-            aria-label="Hold this key"
-            style={{ "--hold-ms": `${currentEvent.holdMs ?? 0}ms` } as React.CSSProperties}
-          >
-            <i />
-            <span>HOLD · RELEASE WITH THE PHRASE</span>
-          </div>
-        )}
       </div>
 
       <div className="next-lyric">

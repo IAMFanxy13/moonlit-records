@@ -9,8 +9,6 @@ import type {
 } from "./jianpu-types";
 
 const JIANPU_TOKEN = /(?:[\^,·.]?[0-7](?:_{1,2})?(?:\.)?(?:-+)?)/gu;
-const HAN = /\p{Script=Han}/u;
-
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -22,9 +20,7 @@ function uniqueWarnings(warnings: JianpuWarning[]): JianpuWarning[] {
 function lyricTokens(text: string): string[] {
   const clean = text.replace(/[|｜]/gu, " ").trim();
   if (!clean) return [];
-  if (/\s/u.test(clean)) return clean.split(/\s+/u).filter(Boolean);
-  if (HAN.test(clean)) return clean.match(/\p{Script=Han}|[A-Za-z]+/gu) ?? [];
-  return clean.match(/[A-Za-z]+(?:'[A-Za-z]+)?/gu) ?? [];
+  return clean.match(/\p{Script=Han}|[A-Za-z]+(?:'[A-Za-z]+)?/gu) ?? [];
 }
 
 function octaveFor(raw: string): number {
@@ -89,10 +85,18 @@ function nearestLyricLine(lines: RecognizedScoreLine[], notationIndex: number): 
 
 function assignLyrics(notes: ParsedJianpuNote[], lyricText: string): ParsedJianpuNote[] {
   const tokens = lyricTokens(lyricText);
-  return notes.map((note, index) => ({
-    ...note,
-    lyric: tokens.length === 0 ? null : tokens[Math.min(index, tokens.length - 1)],
-  }));
+  const soundedCount = notes.filter((note) => !note.rest).length;
+  let soundedIndex = 0;
+
+  return notes.map((note) => {
+    if (note.rest || tokens.length === 0) return { ...note, lyric: null };
+
+    const tokenIndex = tokens.length >= soundedCount
+      ? soundedIndex
+      : Math.floor((soundedIndex * tokens.length) / soundedCount);
+    soundedIndex += 1;
+    return { ...note, lyric: tokens[Math.min(tokenIndex, tokens.length - 1)] };
+  });
 }
 
 function parseRows(pages: RecognizedScorePage[]): { rows: ParsedJianpuRow[]; warnings: JianpuWarning[] } {
@@ -181,4 +185,3 @@ export function parseJianpuPages(
     confidence,
   };
 }
-

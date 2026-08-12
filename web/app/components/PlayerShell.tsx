@@ -19,7 +19,7 @@ import {
 import type { PianoVoice, SongPackage } from "../lib/song";
 import { scaleSongTempo } from "../lib/tempo";
 import { LyricStage } from "./LyricStage";
-import { RhythmGuide } from "./RhythmGuide";
+import { RhythmGuide, SharedDurationBar } from "./RhythmGuide";
 import { ScreenKeyboard, type KeyFeedback } from "./ScreenKeyboard";
 
 interface PlayerShellProps {
@@ -41,7 +41,6 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   const [feedback, setFeedback] = useState<KeyFeedback | null>(null);
   const [pressedCodes, setPressedCodes] = useState<Set<string>>(() => new Set());
   const [voice, setVoice] = useState<PianoVoice>(song.recommendedPiano);
-  const [earlyHold, setEarlyHold] = useState(false);
   const [restRemainingMs, setRestRemainingMs] = useState(
     () => performanceSong.events[0]?.restBeforeMs ?? 0,
   );
@@ -145,7 +144,6 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
         if (result.sound) {
           const handle = piano.attack(result.sound.notes, result.sound.velocity);
           attackedHandles.current.set(event.code, handle);
-          setEarlyHold(false);
           setFeedback({ code: event.code, kind: result.sound.kind });
         }
         return result.state;
@@ -160,8 +158,6 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
       }
       setPlayerState((current) => {
         const result = releaseKey(current, performanceSong, event.code, event.timeStamp);
-        if (result.holdResult === "early") setEarlyHold(true);
-        if (result.holdResult === "complete") setEarlyHold(false);
         return result.state;
       });
       setPressedCodes((current) => {
@@ -199,13 +195,12 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     if (playerState.status === "ringing") return "LET IT RING";
     if (playerState.status === "paused") return "Paused — the keyboard remains open for free play.";
     if (isResting) return `Silent rest — the next key opens in ${(restRemainingMs / 1000).toFixed(1)}s.`;
-    if (earlyHold) return "Release was early — press and hold the illuminated key once more.";
     if (feedback?.kind === "wrong" && currentEvent) {
       return `${labelForCode(feedback.code)} is free play. ${labelForCode(currentEvent.targetCode)} is still waiting.`;
     }
-    if (feedback?.kind === "correct") return "That is the note — let it breathe.";
-    return "Follow the illuminated initial. Every other key remains your piano.";
-  }, [currentEvent, earlyHold, feedback, isResting, playerState.status, restRemainingMs]);
+    if (feedback?.kind === "correct") return "The guide is draining — release whenever you choose.";
+    return "The bar is guidance only. It moves only while you hold the expected key.";
+  }, [currentEvent, feedback, isResting, playerState.status, restRemainingMs]);
 
   const handleVoiceChange = (nextVoice: PianoVoice) => {
     setVoice(nextVoice);
@@ -221,7 +216,6 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     releaseEverything();
     completedOnce.current = false;
     completedRests.current.clear();
-    setEarlyHold(false);
     setFeedback(null);
     setPlayerState((current) => startPlayer(restartPlayer(current)));
   };
@@ -282,7 +276,6 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
         <RhythmGuide
           song={performanceSong}
           eventIndex={playerState.eventIndex}
-          pressedCodes={pressedCodes}
           restRemainingMs={restRemainingMs}
         />
       )}
@@ -294,6 +287,15 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
         </span>
         <strong>{playerState.eventIndex} / {performanceSong.events.length}</strong>
       </div>
+
+      {currentEvent && !["ringing", "complete"].includes(playerState.status) && (
+        <SharedDurationBar
+          key={currentEvent.id}
+          event={currentEvent}
+          active={playerState.activeHold?.code === currentEvent.targetCode}
+          resting={isResting}
+        />
+      )}
 
       <ScreenKeyboard
         targetCode={["ringing", "complete"].includes(playerState.status) || isResting ? null : currentEvent?.targetCode ?? null}

@@ -127,19 +127,12 @@ export function pressKey(
     };
   }
 
-  if (currentEvent.kind === "hold") {
-    if (state.activeHold) return { state, sound: null };
-    return {
-      state: {
-        ...state,
-        activeHold: { eventIndex: state.eventIndex, code, startedAt: now },
-      },
-      sound: { notes: currentEvent.notes, velocity: currentEvent.velocity, kind: "correct" },
-    };
-  }
-
+  if (state.activeHold) return { state, sound: null };
   return {
-    state: advance(state, song),
+    state: {
+      ...state,
+      activeHold: { eventIndex: state.eventIndex, code, startedAt: now },
+    },
     sound: { notes: currentEvent.notes, velocity: currentEvent.velocity, kind: "correct" },
   };
 }
@@ -155,15 +148,10 @@ export function releaseKey(
   code: string,
   now = Date.now(),
 ): ReleaseResult {
+  void now;
   const hold = state.activeHold;
   if (!hold || hold.code !== code || hold.eventIndex !== state.eventIndex) {
     return { state, holdResult: null };
-  }
-
-  const event = song.events[state.eventIndex];
-  const minimumHoldMs = Math.max(0, event?.holdMs ?? 0);
-  if (now - hold.startedAt < minimumHoldMs) {
-    return { state: { ...state, activeHold: null }, holdResult: "early" };
   }
 
   return { state: advance(state, song), holdResult: "complete" };

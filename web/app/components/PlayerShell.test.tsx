@@ -51,10 +51,14 @@ describe("PlayerShell", () => {
     fireEvent.keyUp(window, { code: "KeyH", key: "h" });
     fireEvent.keyDown(window, { code: "KeyN", key: "n" });
 
-    expect(screen.getByText("1 / 8")).toBeInTheDocument();
+    expect(screen.getByText("0 / 8")).toBeInTheDocument();
+    expect(screen.getByTestId("shared-duration-bar")).toHaveAttribute("data-countdown", "draining");
     expect(screen.getByTestId("key-KeyH")).not.toHaveAttribute("data-state", "wrong");
-    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "target");
     expect(piano.attack).toHaveBeenCalledTimes(2);
+
+    fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    expect(screen.getByText("1 / 8")).toBeInTheDocument();
+    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "target");
   });
 
   it("keeps the user-driven rhythm guide in the performance view", () => {
@@ -68,7 +72,10 @@ describe("PlayerShell", () => {
     );
 
     expect(screen.getByLabelText("Rhythm guide")).toBeInTheDocument();
-    expect(screen.getByText(/TAP 0\.2s · N/u)).toBeInTheDocument();
+    expect(screen.getByText(/GUIDE 0\.2s · N/u)).toBeInTheDocument();
+    const durationBar = screen.getByTestId("shared-duration-bar");
+    const keyboard = screen.getByLabelText("Computer keyboard piano");
+    expect(durationBar.compareDocumentPosition(keyboard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("holds each attacked note until its own keyup and supports chords", () => {
@@ -88,16 +95,17 @@ describe("PlayerShell", () => {
 
     expect(piano.attack).toHaveBeenCalledTimes(2);
     expect(piano.release).not.toHaveBeenCalled();
-    expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "pressed");
-    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "correct");
+    expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "target");
+    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "wrong");
 
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
     expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: ["G4"] }));
     expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "idle");
-    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "correct");
+    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "target");
 
     fireEvent.keyUp(window, { code: "KeyH", key: "h" });
-    expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: ["A4"] }));
+    expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: ["C#5"] }));
+    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "target");
   });
 
   it("supports pause without consuming a lyric step", () => {
@@ -130,12 +138,13 @@ describe("PlayerShell", () => {
     );
 
     fireEvent.keyDown(window, { code: "KeyN", key: "n" });
-    expect(screen.getByText("LET IT RING")).toBeInTheDocument();
+    expect(screen.getByText("0 / 1")).toBeInTheDocument();
 
     act(() => vi.advanceTimersByTime(12000));
     expect(onComplete).not.toHaveBeenCalled();
 
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    expect(screen.getByText("LET IT RING")).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(5899));
     expect(onComplete).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(1));
@@ -195,7 +204,7 @@ describe("PlayerShell", () => {
     expect(screen.getByText("0 / 8")).toBeInTheDocument();
   });
 
-  it("shows a hold rail and keeps waiting after an early release", () => {
+  it("uses the duration rail as guidance and advances on any matching release", () => {
     const piano = fakePiano();
     const base = builtinSongs[0];
     const holdSong = {
@@ -205,11 +214,12 @@ describe("PlayerShell", () => {
     };
     render(<PlayerShell song={holdSong} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
 
-    expect(screen.getByLabelText("Hold this key")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Hold this key")).not.toBeInTheDocument();
     fireEvent.keyDown(window, { code: "KeyN", key: "n", timeStamp: 100 });
+    expect(screen.getByTestId("shared-duration-bar")).toHaveAttribute("data-countdown", "draining");
     fireEvent.keyUp(window, { code: "KeyN", key: "n", timeStamp: 200 });
-    expect(screen.getByText("0 / 1")).toBeInTheDocument();
-    expect(screen.getByText(/Release was early/)).toBeInTheDocument();
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+    expect(screen.queryByText(/Release was early/)).not.toBeInTheDocument();
   });
 
   it("rescales the highway with tempo and keeps a printed rest silent", () => {
@@ -244,6 +254,6 @@ describe("PlayerShell", () => {
 
     fireEvent.change(screen.getByRole("slider", { name: "Tempo" }), { target: { value: "60" } });
     expect(screen.getByText("60 BPM")).toBeInTheDocument();
-    expect(screen.getByText("HOLD 1.2s · N")).toBeInTheDocument();
+    expect(screen.getByText("GUIDE 1.2s · N")).toBeInTheDocument();
   });
 });

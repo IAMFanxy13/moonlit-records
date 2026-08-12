@@ -15,17 +15,21 @@ import { builtinSongs } from "./songs";
 const song = builtinSongs[0];
 
 describe("player machine", () => {
-  it("plays the song note and advances exactly one event for the target key", () => {
+  it("starts the guided note on keydown and advances on its matching release", () => {
     const started = startPlayer(createPlayerState(song));
-    const result = pressKey(started, song, song.events[0].targetCode);
+    const result = pressKey(started, song, song.events[0].targetCode, 100);
 
     expect(result.sound).toEqual({
       notes: song.events[0].notes,
       velocity: song.events[0].velocity,
       kind: "correct",
     });
-    expect(result.state.eventIndex).toBe(1);
-    expect(result.state.correctCount).toBe(1);
+    expect(result.state.eventIndex).toBe(0);
+    expect(result.state.activeHold).toMatchObject({ code: song.events[0].targetCode, startedAt: 100 });
+
+    const released = releaseKey(result.state, song, song.events[0].targetCode, 120);
+    expect(released.state.eventIndex).toBe(1);
+    expect(released.state.correctCount).toBe(1);
   });
 
   it("plays a wrong key's default note but keeps waiting for the same target", () => {
@@ -72,9 +76,12 @@ describe("player machine", () => {
     expect(rewound.correctCount).toBe(song.phrases[1].startEvent);
   });
 
-  it("rings after every target key has been pressed, then completes explicitly", () => {
+  it("rings after every target key has been pressed and released, then completes explicitly", () => {
     let state = startPlayer(createPlayerState(song));
-    for (const event of song.events) state = pressKey(state, song, event.targetCode).state;
+    for (const event of song.events) {
+      state = pressKey(state, song, event.targetCode).state;
+      state = releaseKey(state, song, event.targetCode).state;
+    }
     expect(state.status).toBe("ringing");
     expect(state.eventIndex).toBe(song.events.length);
 
@@ -93,10 +100,11 @@ describe("player machine", () => {
 
     const result = pressKey(startPlayer(createPlayerState(chordSong)), chordSong, "KeyA", 100);
     expect(result.sound?.notes).toEqual(["C4", "E4", "G4"]);
-    expect(result.state.status).toBe("ringing");
+    expect(result.state.status).toBe("playing");
+    expect(releaseKey(result.state, chordSong, "KeyA", 101).state.status).toBe("ringing");
   });
 
-  it("advances a held lyric only after a long-enough matching release", () => {
+  it("uses the printed duration as guidance and never judges an early release", () => {
     const holdSong = {
       ...song,
       phrases: [{ id: "hold", text: "爱", startEvent: 0, endEvent: 0 }],
@@ -114,13 +122,8 @@ describe("player machine", () => {
     expect(earlyAttack.eventIndex).toBe(0);
     expect(earlyAttack.activeHold).toMatchObject({ eventIndex: 0, code: "KeyA", startedAt: 100 });
     const earlyRelease = releaseKey(earlyAttack, holdSong, "KeyA", 220);
-    expect(earlyRelease.state.eventIndex).toBe(0);
-    expect(earlyRelease.holdResult).toBe("early");
-
-    const fullAttack = pressKey(earlyRelease.state, holdSong, "KeyA", 300).state;
-    const fullRelease = releaseKey(fullAttack, holdSong, "KeyA", 1200);
-    expect(fullRelease.state.eventIndex).toBe(1);
-    expect(fullRelease.state.status).toBe("ringing");
-    expect(fullRelease.holdResult).toBe("complete");
+    expect(earlyRelease.state.eventIndex).toBe(1);
+    expect(earlyRelease.state.status).toBe("ringing");
+    expect(earlyRelease.holdResult).toBe("complete");
   });
 });

@@ -90,8 +90,8 @@ describe("parseJianpuPages", () => {
       [1, 1, 5],
       [0, 6, 5],
     ]);
-    expect(parsed.rows[0].notes.map((note) => note.lyric)).toEqual(["静", "止", "了", "了"]);
-    expect(parsed.rows[1].notes.map((note) => note.lyric)).toEqual(["你", "喜欢", "喜欢"]);
+    expect(parsed.rows[0].notes.map((note) => note.lyric)).toEqual(["静", "静", "止", "了"]);
+    expect(parsed.rows[1].notes.map((note) => note.lyric)).toEqual(["你", "喜", "欢"]);
   });
 
   test("keeps usable notes and marks the score estimated when lyrics or rhythm are incomplete", () => {
@@ -101,5 +101,66 @@ describe("parseJianpuPages", () => {
     expect(parsed.warnings).toContain("TEMPO_ESTIMATED");
     expect(parsed.warnings).toContain("LYRICS_INCOMPLETE");
     expect(parsed.rows[2].notes[1].beats).toBe(1);
+  });
+
+  test("maps spaced Chinese lyrics character by character without letting rests consume a lyric", () => {
+    const pages: RecognizedScorePage[] = [{
+      id: "spaced-lyrics",
+      width: 1000,
+      height: 600,
+      lines: [
+        { text: "1 2 0 3 4", role: "notation", top: 100, confidence: 0.96 },
+        { text: "静 止 了 爱", role: "lyrics", top: 140, confidence: 0.98 },
+      ],
+    }];
+
+    const parsed = parseJianpuPages(pages);
+
+    expect(parsed.rows[0].notes.map((note) => note.lyric)).toEqual([
+      "静",
+      "止",
+      null,
+      "了",
+      "爱",
+    ]);
+  });
+
+  test("repeats lyric characters across extra melody notes instead of repeating only the last character", () => {
+    const pages: RecognizedScorePage[] = [{
+      id: "melisma",
+      width: 1000,
+      height: 600,
+      lines: [
+        { text: "1 2 3 4 5 6", role: "notation", top: 100, confidence: 0.96 },
+        { text: "我 爱 你", role: "lyrics", top: 140, confidence: 0.98 },
+      ],
+    }];
+
+    const parsed = parseJianpuPages(pages);
+
+    expect(parsed.rows[0].notes.map((note) => note.lyric)).toEqual([
+      "我",
+      "我",
+      "爱",
+      "爱",
+      "你",
+      "你",
+    ]);
+  });
+
+  test("keeps each English word as one lyric token", () => {
+    const pages: RecognizedScorePage[] = [{
+      id: "english-lyrics",
+      width: 1000,
+      height: 600,
+      lines: [
+        { text: "1 2 3", role: "notation", top: 100, confidence: 0.96 },
+        { text: "You are mine", role: "lyrics", top: 140, confidence: 0.98 },
+      ],
+    }];
+
+    const parsed = parseJianpuPages(pages);
+
+    expect(parsed.rows[0].notes.map((note) => note.lyric)).toEqual(["You", "are", "mine"]);
   });
 });

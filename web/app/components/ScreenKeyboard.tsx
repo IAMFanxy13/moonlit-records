@@ -25,8 +25,8 @@ export function ScreenKeyboard({ targetCode, feedback, pressedCodes }: ScreenKey
             {row.map((item) => {
               let state = item.disabled ? "disabled" : "idle";
               if (pressedCodes.has(item.code)) state = "pressed";
-              if (item.code === targetCode) state = "target";
               if (feedback?.code === item.code) state = feedback.kind;
+              if (item.code === targetCode) state = "target";
 
               return (
                 <button
