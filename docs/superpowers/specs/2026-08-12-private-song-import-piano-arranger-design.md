@@ -19,6 +19,7 @@ The governing quality rule is **fail soft, always produce**:
 ## 2. Approved Product Decisions
 
 - Importing audio or video is the primary path. Search is secondary and is used for the user's private library, already prepared lawful song packages, and metadata enrichment.
+- Once a likely recording is identified, the system uses every configured, permitted online evidence source to supplement lyrics, synchronized lyric timing, title, artist, album, release, cover art, language, writers, composers, lyricists, version, identifiers, genre, and other useful arrangement context.
 - Imported source media and generated artifacts are private to the importing user in the first version. They are not published or shared.
 - The interface is English-first. Lyrics may remain in their source language, including Chinese.
 - The arrangement favors recognizability over literal multi-track reproduction.
@@ -39,6 +40,9 @@ The implementation composes mature, independently replaceable tools rather than 
 - [FFmpeg](https://ffmpeg.org/documentation.html) for media decoding, audio extraction, resampling, channel conversion, and normalization.
 - [Chromaprint](https://github.com/acoustid/chromaprint) and [AcoustID](https://musicbrainz.org/doc/AcoustID) for open acoustic fingerprinting.
 - [MusicBrainz Web Service](https://musicbrainz.org/doc/MusicBrainz_API) for recording, artist, release, duration, and identifier metadata enrichment.
+- [MusicBrainz work relationships](https://musicbrainz-docs-development.readthedocs.io/en/latest/terminology/entities/work.html) for composer, lyricist, arranger, translator, publisher, and work-version relationships.
+- [Cover Art Archive](https://musicbrainz.org/doc/Cover_Art_Archive/API) for release-linked artwork.
+- Configurable permitted lyric providers, including licensed commercial providers such as the [Musixmatch Lyrics API](https://www.postman.com/musixmatch-dev/musixmatch-apis/documentation/pqm8o6w/lyrics-api) when credentials and display rights are available, and compatible community providers only when their current terms permit the intended use.
 - [Demucs](https://github.com/facebookresearch/demucs) for separating vocals, drums, bass, and the remaining accompaniment. The processing adapter must be replaceable because the original repository is now maintenance-only.
 - [OpenAI Whisper](https://github.com/openai/whisper) for multilingual transcription, with [WhisperX](https://github.com/m-bain/whisperX) for more precise word-level alignment.
 - [Spotify Basic Pitch](https://github.com/spotify/basic-pitch) for audio-to-MIDI candidate notes.
@@ -82,6 +86,7 @@ Every completed package shows:
 - arrangement confidence as a calm descriptive label (`CLEAR`, `USABLE`, or `SKETCH`), not a punitive score;
 - recommended piano voice;
 - detected language, key, approximate tempo, and duration when available;
+- source/provenance details for online-enriched fields when the user opens track information;
 - `PERFORM` as the primary action;
 - optional `REANALYZE` and metadata correction actions.
 
@@ -93,7 +98,7 @@ No mandatory correction gate blocks performance. A user can immediately play an 
 
 FFmpeg extracts a canonical analysis stream while preserving the original private upload separately. The analysis stream is mono or stereo PCM at the model-required sample rate. Duration, silence ratio, clipping, and decode integrity are recorded before expensive work begins.
 
-### 5.2 Identify the recording
+### 5.2 Identify and enrich the recording
 
 Evidence is considered in this order:
 
@@ -105,6 +110,26 @@ Evidence is considered in this order:
 
 An uncertain identity is never fabricated. The deterministic fallback is `Imported Track` and `Unknown Artist`. Metadata matching failure does not reduce musical processing.
 
+After an identity candidate is selected, an `EnrichmentBroker` queries every configured provider whose terms and credentials permit the requested field. It may add or cross-check:
+
+- title, artist, featured artists, album, release date, version, duration, language, country, genre, ISRC, ISWC, and MusicBrainz identifiers;
+- composers, lyricists, writers, arrangers, translators, performers, and publishers;
+- release-linked cover art;
+- plain, line-synchronized, or word-synchronized lyrics;
+- lawful structured musical evidence such as key, chords, MIDI, or MusicXML when a provider exposes it with sufficient provenance.
+
+Every candidate field stores provider, provider record ID, retrieval time, confidence, rights/usage class, and the evidence used to match the imported recording. Internet results are evidence rather than authority: exact recording/version and duration matches outrank fuzzy title matches.
+
+The broker follows this lyric priority:
+
+1. embedded lyrics, LRC, subtitle, or caption tracks contained in the user's file;
+2. an exact-version result from a configured licensed lyrics provider;
+3. a permitted community lyrics result with adequate provenance;
+4. Whisper/WhisperX transcription from the imported audio;
+5. a merged result in which trusted online text is time-aligned against the imported vocal audio.
+
+Online lyrics are never accepted solely because the title resembles the detected title. The text must pass artist/version/duration checks and acoustic alignment. This prevents a studio lyric sheet, translation, remix, live ad-lib, clean edit, or cover version from silently replacing what is actually sung in the import.
+
 ### 5.3 Separate musical sources
 
 Demucs or a compatible adapter produces at least `vocals`, `drums`, `bass`, and `other` stems. Separation quality is assessed using energy, bleed, clipping, and usable-duration checks.
@@ -113,7 +138,7 @@ If separation fails or yields unusable stems, downstream extractors run on the o
 
 ### 5.4 Recover lyrics and timing
 
-Whisper transcribes the vocal stem (or original mix fallback). WhisperX aligns words or characters to time spans. Identified title, artist, language, and trusted embedded lyrics may guide transcription, but the product does not scrape arbitrary copyrighted lyric pages.
+Whisper transcribes the vocal stem (or original mix fallback). WhisperX aligns words or characters to time spans. Identified title, artist, language, trusted embedded lyrics, and permitted online lyric candidates may guide transcription and correction, but the product does not scrape arbitrary copyrighted lyric pages.
 
 Post-processing:
 
@@ -269,6 +294,8 @@ The next event waits indefinitely for the correct physical key. No missed-time f
 - Source uploads, fingerprints, stems, transcripts, analysis artifacts, and compiled packages are private per user.
 - Storage separates original media from derived artifacts so the user can remove the original while retaining a private lightweight arrangement, or delete both.
 - Public search APIs are used for metadata and lawful prepared packages, not as arbitrary commercial-audio downloaders.
+- Online enrichment sends the minimum necessary fingerprint, identifiers, duration, and metadata queries. It does not send the user's raw source media to metadata or lyric providers.
+- Provider-specific display, caching, attribution, deletion, and expiry rules are recorded and enforced with each enriched field. A provider result that may not be persisted is re-fetched or omitted rather than copied permanently.
 - No imported song becomes public merely because another user imports the same recording.
 - Logs must not include raw lyrics, audio bytes, signed URLs, or private filenames.
 - Object access uses expiring authorization and jobs enforce ownership on every read and mutation.
@@ -282,6 +309,10 @@ Owns import UI, job progress, private library, result summary, KTV stage, 36-key
 ### Application API
 
 Owns authenticated uploads, job creation, status, ownership, metadata correction, package retrieval, retry, and deletion.
+
+### Online enrichment broker
+
+Owns provider adapters, credentials, quotas, rate limiting, field-level provenance, version matching, rights/usage policy, caching rules, and graceful provider fallback. No individual provider is allowed to become a hard dependency for producing a playable arrangement.
 
 ### Object storage
 
@@ -322,6 +353,8 @@ Automated tests must prove:
 - final completion waits for held notes and the full engine-reported tail;
 - every decodable analysis fixture reaches a valid package under each simulated model-stage failure;
 - fallback metadata never hallucinates a title or artist;
+- conflicting online metadata and lyrics are version-matched, source-attributed, and rejected or down-weighted when they do not align with the imported audio;
+- provider timeout, quota exhaustion, or missing credentials never prevents analysis from continuing with embedded data and local model output;
 - partial artifacts are cached and resumable;
 - ownership prevents cross-user access to sources, artifacts, jobs, and packages;
 - the KTV stage simultaneously displays current and next phrases;
@@ -336,16 +369,17 @@ Representative fixtures must include studio pop, dense electronic production, ac
 3. Every decodable file with usable audio yields a valid `CLEAR`, `USABLE`, or `SKETCH` piano package even when one or more analysis stages fail.
 4. The generated package prioritizes the sung melody and recognizable musical hooks, reducing all source instruments to a coherent piano interpretation.
 5. Search enriches metadata and discovers existing private/prepared packages but never assumes permission to fetch arbitrary commercial audio.
-6. The performance screen uses only digits `1–0` and letters `A–Z`.
-7. Every musical event requires exactly one physical key and can emit one or more piano pitches.
-8. No physical key press means no piano sound and no progression.
-9. Physical key hold/release matches piano attack, natural held decay, and release behavior.
-10. Wrong keys remain expressive free-piano notes and never skip the target.
-11. Free Performance waits for the player and does not enforce the recording's tempo.
-12. The final experience waits for all held notes and their acoustic tail before completion.
-13. Current and next lyric phrases remain visible in the KTV-style stage.
-14. Imported media and every derived artifact remain private to their owner.
-15. The recommended or manually selected piano voice governs the complete 36-key instrument, including guided notes, wrong notes, and free improvisation.
+6. Once a recording is identified, all configured permitted providers are queried for useful metadata and lyrics; every accepted field retains provenance and must match the imported version.
+7. The performance screen uses only digits `1–0` and letters `A–Z`.
+8. Every musical event requires exactly one physical key and can emit one or more piano pitches.
+9. No physical key press means no piano sound and no progression.
+10. Physical key hold/release matches piano attack, natural held decay, and release behavior.
+11. Wrong keys remain expressive free-piano notes and never skip the target.
+12. Free Performance waits for the player and does not enforce the recording's tempo.
+13. The final experience waits for all held notes and their acoustic tail before completion.
+14. Current and next lyric phrases remain visible in the KTV-style stage.
+15. Imported media and every derived artifact remain private to their owner.
+16. The recommended or manually selected piano voice governs the complete 36-key instrument, including guided notes, wrong notes, and free improvisation.
 
 ## 18. Explicit Non-goals for This Delivery
 
