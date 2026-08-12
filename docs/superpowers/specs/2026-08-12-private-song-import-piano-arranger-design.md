@@ -25,6 +25,7 @@ The governing quality rule is **fail soft, always produce**:
 - Performance is `Free Performance` by default: the song waits for the player, rather than advancing at the original recording's tempo.
 - The source recording does not play as accompaniment during performance. There is no automatic melody, backing track, or audible metronome.
 - A piano sound is produced only by a physical performance-key press.
+- The selected piano voice belongs to the whole 36-key instrument. Guided song pitches, wrong keys, and every free-improvisation note use the same active voice and acoustic space.
 - Only `Digit1` through `Digit0` and `KeyA` through `KeyZ` are performance keys. Space, Shift, Escape, punctuation, arrows, modifiers, and function keys have no performance role.
 - A physical-key hold behaves as a piano-key hold. Releasing the physical key releases the attacked piano voice into its natural tail.
 - One performance event always consumes exactly one computer-key press, even when the musical output is a chord or other multi-pitch piano voicing.
@@ -187,7 +188,7 @@ A `PerformanceEvent` includes:
 - lyric token reference or instrumental marker;
 - target physical key code;
 - one or more MIDI pitches;
-- velocity and recommended piano voice;
+- velocity;
 - source start/end timestamps for provenance only;
 - event kind: `tap` or `hold`;
 - hold duration guidance when applicable;
@@ -195,6 +196,8 @@ A `PerformanceEvent` includes:
 - optional provenance links to melody, chord, beat, and lyric artifacts.
 
 One computer key may therefore trigger a single note, octave, dyad, triad, or reduced piano chord. The player never requires a simultaneous multi-key chord to advance one event.
+
+The `SongPackage`, rather than an individual event, stores a recommended piano voice. The player initializes the performance session with that recommendation, while the user may select another voice for the entire instrument.
 
 ## 8. Lyric-to-Key Rules
 
@@ -236,6 +239,9 @@ No special, punctuation, modifier, navigation, or function key is captured for p
 ## 11. Piano Input and Audio Invariants
 
 - Silence is the default. No scheduler produces piano sound without a physical performance-key event.
+- One session-level `activeVoice` configures the samples/model, tone contour, release, and room response for all 36 keys. A guided target temporarily changes a key's pitch or voicing, never its instrument identity.
+- Correct guided notes, wrong notes, and unrestricted improvisation notes always attack through the same `activeVoice`.
+- Changing the voice affects every subsequent attack. Notes already held or ringing finish through the voice that originally attacked them, avoiding clicks, truncation, and an acoustically impossible mid-note instrument swap.
 - `keydown` attacks once. Browser/OS key-repeat events are ignored.
 - Holding the physical key keeps the virtual damper lifted while the sampled or modeled piano naturally decays; it does not loop or retrigger mechanically.
 - `keyup` releases exactly the note or voicing attacked by that physical key.
@@ -307,6 +313,7 @@ Automated tests must prove:
 - silence persists without physical key input;
 - keydown attacks once, repeat is ignored, hold does not retrigger, and keyup releases the exact attacked pitches;
 - a one-key polyphonic event attacks/releases every pitch in its voicing;
+- changing the piano voice changes subsequent correct, wrong, and free-key attacks across the whole keyboard, while already attacked notes release safely through their original voice;
 - wrong keys sound, mark red, and do not advance;
 - repeated targets require release and another keydown;
 - Chinese initials, English word initials, melisma repetition, same-pitch lyric tokens, long holds, and punctuation behavior compile correctly;
@@ -338,6 +345,7 @@ Representative fixtures must include studio pop, dense electronic production, ac
 12. The final experience waits for all held notes and their acoustic tail before completion.
 13. Current and next lyric phrases remain visible in the KTV-style stage.
 14. Imported media and every derived artifact remain private to their owner.
+15. The recommended or manually selected piano voice governs the complete 36-key instrument, including guided notes, wrong notes, and free improvisation.
 
 ## 18. Explicit Non-goals for This Delivery
 
@@ -348,4 +356,3 @@ Representative fixtures must include studio pop, dense electronic production, ac
 - MIDI hardware, mobile touch performance, sustain pedal, Space/Shift controls, punctuation keys, function keys, or ROG keyboard-light integration;
 - automatic backing tracks, autoplay, or original-tempo scoring;
 - claiming perfect lyrics, authorship, pitch, chord, or arrangement accuracy.
-
