@@ -14,6 +14,8 @@ export interface SongEvent {
   velocity: number;
   kind: "tap" | "hold";
   holdMs?: number;
+  /** Silent time that must elapse before this gesture becomes the active target. */
+  restBeforeMs?: number;
   sourceStartMs?: number;
   sourceEndMs?: number;
   confidence: number;
@@ -35,6 +37,8 @@ export interface SongPackage {
   searchAliases: string[];
   lyricLanguage: "zh-CN" | "en";
   durationLabel: string;
+  /** Authoring tempo. Older saved packages omit this and play at the 72 BPM default. */
+  tempoBpm?: number;
   recommendedPiano: PianoVoice;
   quality: ArrangementQuality;
   provenance: string[];
