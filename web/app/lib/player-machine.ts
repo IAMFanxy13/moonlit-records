@@ -9,7 +9,7 @@ export interface Mistake {
 }
 
 export interface PlayerState {
-  status: "ready" | "playing" | "paused" | "complete";
+  status: "ready" | "playing" | "paused" | "ringing" | "complete";
   eventIndex: number;
   correctCount: number;
   mistakes: Mistake[];
@@ -42,6 +42,10 @@ export function togglePause(state: PlayerState): PlayerState {
 
 export function restartPlayer(_state: PlayerState): PlayerState {
   return { status: "ready", eventIndex: 0, correctCount: 0, mistakes: [] };
+}
+
+export function finishRinging(state: PlayerState): PlayerState {
+  return state.status === "ringing" ? { ...state, status: "complete" } : state;
 }
 
 export function rewindPhrase(state: PlayerState, song: SongPackage): PlayerState {
@@ -94,7 +98,7 @@ export function pressKey(state: PlayerState, song: SongPackage, code: string): K
       ...state,
       eventIndex: nextEventIndex,
       correctCount: state.correctCount + 1,
-      status: nextEventIndex === song.events.length ? "complete" : "playing",
+      status: nextEventIndex === song.events.length ? "ringing" : "playing",
     },
     sound: { note: currentEvent.note, velocity: currentEvent.velocity, kind: "correct" },
   };

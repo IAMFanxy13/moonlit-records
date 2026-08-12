@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { defaultNoteFor } from "./keyboard";
 import {
   createPlayerState,
+  finishRinging,
   pressKey,
   rewindPhrase,
   restartPlayer,
@@ -70,10 +71,15 @@ describe("player machine", () => {
     expect(rewound.correctCount).toBe(song.phrases[1].startEvent);
   });
 
-  it("completes only after every target key has been pressed", () => {
+  it("rings after every target key has been pressed, then completes explicitly", () => {
     let state = startPlayer(createPlayerState(song));
     for (const event of song.events) state = pressKey(state, song, event.targetCode).state;
-    expect(state.status).toBe("complete");
+    expect(state.status).toBe("ringing");
     expect(state.eventIndex).toBe(song.events.length);
+
+    const encore = pressKey(state, song, "KeyQ");
+    expect(encore.sound?.kind).toBe("free");
+    expect(encore.state).toBe(state);
+    expect(finishRinging(state).status).toBe("complete");
   });
 });
