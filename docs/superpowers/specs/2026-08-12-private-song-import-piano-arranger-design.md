@@ -18,7 +18,7 @@ The governing quality rule is **fail soft, always produce**:
 
 ## 2. Approved Product Decisions
 
-- Importing audio or video is the primary path. Search is secondary and is used for the user's private library, already prepared lawful song packages, and metadata enrichment.
+- Importing audio or video is the primary path and the dominant first-screen action. Search is secondary and is used for the user's private library, already prepared lawful song packages, and metadata enrichment; it never assumes the user can stream or download a VIP recording from a music platform.
 - Once a likely recording is identified, the system uses every configured, permitted online evidence source to supplement lyrics, synchronized lyric timing, title, artist, album, release, cover art, language, writers, composers, lyricists, version, identifiers, genre, and other useful arrangement context.
 - Imported source media and generated artifacts are private to the importing user in the first version. They are not published or shared.
 - The interface is English-first. Lyrics may remain in their source language, including Chinese.
@@ -42,7 +42,7 @@ The implementation composes mature, independently replaceable tools rather than 
 - [MusicBrainz Web Service](https://musicbrainz.org/doc/MusicBrainz_API) for recording, artist, release, duration, and identifier metadata enrichment.
 - [MusicBrainz work relationships](https://musicbrainz-docs-development.readthedocs.io/en/latest/terminology/entities/work.html) for composer, lyricist, arranger, translator, publisher, and work-version relationships.
 - [Cover Art Archive](https://musicbrainz.org/doc/Cover_Art_Archive/API) for release-linked artwork.
-- Configurable permitted lyric providers, including licensed commercial providers such as the [Musixmatch Lyrics API](https://www.postman.com/musixmatch-dev/musixmatch-apis/documentation/pqm8o6w/lyrics-api) when credentials and display rights are available, and compatible community providers only when their current terms permit the intended use.
+- Configurable free/open lyric providers only when their current terms permit the intended use. No paid lyrics API, commercial trial dependency, or unofficial scraping endpoint is part of the product.
 - [Demucs](https://github.com/facebookresearch/demucs) for separating vocals, drums, bass, and the remaining accompaniment. The processing adapter must be replaceable because the original repository is now maintenance-only.
 - [OpenAI Whisper](https://github.com/openai/whisper) for multilingual transcription, with [WhisperX](https://github.com/m-bain/whisperX) for more precise word-level alignment.
 - [Spotify Basic Pitch](https://github.com/spotify/basic-pitch) for audio-to-MIDI candidate notes.
@@ -52,6 +52,8 @@ The implementation composes mature, independently replaceable tools rather than 
 These tools provide evidence, not unquestioned truth. The arrangement compiler merges candidates, rejects obvious octave and breath artifacts, assigns confidence, and applies deterministic fallbacks.
 
 ## 4. User Experience
+
+The built-in starter catalogue includes the complete common six-line Chinese version of `Twinkle, Twinkle, Little Star` (42 lyric events) using the full public-domain melody. It is a ready-to-play reference package and a regression fixture for Chinese pinyin initials, repeated words, phrase transitions, global piano voices, and acoustic completion.
 
 ### 4.1 Library and import
 
@@ -123,8 +125,8 @@ Every candidate field stores provider, provider record ID, retrieval time, confi
 The broker follows this lyric priority:
 
 1. embedded lyrics, LRC, subtitle, or caption tracks contained in the user's file;
-2. an exact-version result from a configured licensed lyrics provider;
-3. a permitted community lyrics result with adequate provenance;
+2. an exact-version result from a configured free/open lyrics provider whose current terms permit use;
+3. a permitted free/open community lyrics result with adequate provenance;
 4. Whisper/WhisperX transcription from the imported audio;
 5. a merged result in which trusted online text is time-aligned against the imported vocal audio.
 
@@ -296,6 +298,8 @@ The next event waits indefinitely for the correct physical key. No missed-time f
 - Public search APIs are used for metadata and lawful prepared packages, not as arbitrary commercial-audio downloaders.
 - Online enrichment sends the minimum necessary fingerprint, identifiers, duration, and metadata queries. It does not send the user's raw source media to metadata or lyric providers.
 - Provider-specific display, caching, attribution, deletion, and expiry rules are recorded and enforced with each enriched field. A provider result that may not be persisted is re-fetched or omitted rather than copied permanently.
+- The product must not require a paid API, paid lyrics catalogue, paid inference endpoint, or usage-based commercial service. Analysis models run locally or on user-controlled/self-hosted open-source workers; the browser fallback remains available without a worker.
+- Free services and community APIs are optional enrichment only. Quota exhaustion, removal, or a later pricing change disables that adapter without disabling import or performance.
 - No imported song becomes public merely because another user imports the same recording.
 - Logs must not include raw lyrics, audio bytes, signed URLs, or private filenames.
 - Object access uses expiring authorization and jobs enforce ownership on every read and mutation.
@@ -390,3 +394,4 @@ Representative fixtures must include studio pop, dense electronic production, ac
 - MIDI hardware, mobile touch performance, sustain pedal, Space/Shift controls, punctuation keys, function keys, or ROG keyboard-light integration;
 - automatic backing tracks, autoplay, or original-tempo scoring;
 - claiming perfect lyrics, authorship, pitch, chord, or arrangement accuracy.
+- paid APIs, paid model inference, paid lyrics databases, and trial-only external dependencies.
