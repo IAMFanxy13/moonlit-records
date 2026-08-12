@@ -78,18 +78,20 @@ export async function analyzeMediaFile(
   onProgress({
     stage: "transcribing",
     detail: "Loading Spotify Basic Pitch and analysing every window locally.",
-    fraction: 0,
+    fraction: 0.08,
     method: "neural",
   });
 
   let evidence: AnalysisEvidence;
   let analysisMethod: "neural" | "fallback" = "neural";
+  let analysisFraction = 0.08;
   try {
     evidence = await (dependencies.transcribe ?? transcribeWithBasicPitch)(pcm, (fraction) => {
+      analysisFraction = Math.max(analysisFraction, 0.08 + Math.max(0, Math.min(1, fraction)) * 0.84);
       onProgress({
         stage: "transcribing",
         detail: `Local transcription ${Math.round(fraction * 100)}% complete.`,
-        fraction,
+        fraction: analysisFraction,
         method: "neural",
       });
     });
@@ -98,7 +100,7 @@ export async function analyzeMediaFile(
     onProgress({
       stage: "transcribing",
       detail: "Neural transcription was unavailable; building an honest local rhythm sketch.",
-      fraction: 0,
+      fraction: analysisFraction,
       method: "fallback",
     });
     const sketch = analyzePcmToSketch(pcm);

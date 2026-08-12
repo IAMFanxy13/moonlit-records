@@ -29,7 +29,10 @@ describe("browser media analyzer", () => {
     });
 
     expect(progress.map((item) => item.stage)).toContain("transcribing");
-    expect(progress.find((item) => item.stage === "transcribing" && item.fraction === 0.25)).toMatchObject({ method: "neural" });
+    const quarterProgress = progress.find((item) => item.detail === "Local transcription 25% complete.");
+    expect(quarterProgress).toMatchObject({ fraction: 0.29, method: "neural" });
+    const fractions = progress.flatMap((item) => item.fraction === undefined ? [] : [item.fraction]);
+    expect(fractions.every((fraction, index) => index === 0 || fraction >= fractions[index - 1])).toBe(true);
     expect(record).toMatchObject({
       id: "import-abc123",
       checksum: "abc123",
