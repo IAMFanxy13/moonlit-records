@@ -1,12 +1,14 @@
 import { compileArrangement } from "../lib/arrangement-compiler";
+import { transcribeWithBasicPitch } from "./basic-pitch-transcriber";
 import { parseFilenameMetadata } from "./filename-metadata";
 import { analyzePcmToSketch, type PcmInput } from "./pcm-sketch";
-import type { ImportProgress, PrivateSongRecord } from "./types";
+import type { AnalysisEvidence, ImportProgress, PrivateSongRecord } from "./types";
 import { ImportMediaError } from "./types";
 
 interface AnalyzerDependencies {
   decode?: (file: File) => Promise<PcmInput>;
   checksum?: (file: File) => Promise<string>;
+  transcribe?: (pcm: PcmInput, onProgress: (fraction: number) => void) => Promise<AnalysisEvidence>;
 }
 
 const SUPPORTED_EXTENSIONS = /\.(mp3|wav|flac|m4a|aac|ogg|mp4|mov|webm)$/iu;
@@ -63,7 +65,7 @@ export async function analyzeMediaFile(
     throw new ImportMediaError("UNSUPPORTED_MEDIA", "Choose an audio or video recording.");
   }
 
-  onProgress({ stage: "preparing", detail: "Opening the recording privately on this device." });
+  onProgress({ stage: "preparing", detail: "Decoding the complete recording privately on this device.", fraction: 0 });
   const [pcm, checksum] = await Promise.all([
     (dependencies.decode ?? decodeInBrowser)(file),
     (dependencies.checksum ?? checksumFile)(file),
@@ -72,38 +74,75 @@ export async function analyzeMediaFile(
   const durationMs = (pcm.samples.length / pcm.sampleRate) * 1000;
   if (durationMs > MAX_DURATION_MS) throw new ImportMediaError("MEDIA_TOO_LONG", "Choose a recording shorter than 30 minutes.");
 
-  onProgress({ stage: "identifying", detail: "Reading the title and artist, with no subscription required." });
-  onProgress({ stage: "separating", detail: "Using a mix-safe on-device fallback; the recording never leaves your browser." });
-  onProgress({ stage: "lyrics", detail: "Keeping lyric recovery optional so missing words never stop the arrangement." });
-  onProgress({ stage: "melody", detail: "Tracing audible pitch, pulse, and phrase energy." });
-  const evidence = analyzePcmToSketch(pcm);
+  onProgress({ stage: "identifying", detail: "Reading filename metadata before optional free song lookup.", fraction: 0.04 });
+  onProgress({
+    stage: "transcribing",
+    detail: "Loading Spotify Basic Pitch and analysing every window locally.",
+    fraction: 0,
+    method: "neural",
+  });
 
-  onProgress({ stage: "arranging", detail: "Reducing the recording to one-key piano events." });
+  let evidence: AnalysisEvidence;
+  let analysisMethod: "neural" | "fallback" = "neural";
+  try {
+    evidence = await (dependencies.transcribe ?? transcribeWithBasicPitch)(pcm, (fraction) => {
+      onProgress({
+        stage: "transcribing",
+        detail: `Local transcription ${Math.round(fraction * 100)}% complete.`,
+        fraction,
+        method: "neural",
+      });
+    });
+  } catch {
+    analysisMethod = "fallback";
+    onProgress({
+      stage: "transcribing",
+      detail: "Neural transcription was unavailable; building an honest local rhythm sketch.",
+      fraction: 0,
+      method: "fallback",
+    });
+    const sketch = analyzePcmToSketch(pcm);
+    evidence = {
+      ...sketch,
+      warnings: [...sketch.warnings, "NEURAL_TRANSCRIPTION_UNAVAILABLE"],
+    };
+  }
+
+  onProgress({ stage: "arranging", detail: "Reducing simultaneous notes to one-key piano gestures.", fraction: 0.94, method: analysisMethod });
+  const provenance = analysisMethod === "neural" ? "spotify-basic-pitch" : "browser-pcm-sketch";
   const song = compileArrangement({
     id: `import-${checksum}`,
     title: metadata.title,
     artist: metadata.artist,
-    version: "Private On-device Piano Sketch",
+    version: evidence.quality === "sketch" ? "Private Fallback Piano Sketch" : "Private Local Piano Transcription",
     lyricLanguage: "en",
     lyrics: [],
     instrumental: evidence.events.map((event) => ({
       notes: event.notes,
+      durationMs: event.durationMs,
+      kind: event.durationMs >= 600 ? "hold" : "tap",
+      holdMs: event.durationMs >= 600 ? event.durationMs : undefined,
       velocity: event.velocity,
       confidence: event.confidence,
-      provenance: ["browser-pcm-sketch"],
+      provenance: [provenance],
     })),
     recommendedPiano: "warm",
   });
   song.durationLabel = durationLabel(evidence.durationMs);
   song.quality = evidence.quality;
-  song.provenance = ["private-import", "browser-pcm-sketch"];
+  song.provenance = ["private-import", provenance];
   song.events.forEach((event, index) => {
     const source = evidence.events[index];
     event.sourceStartMs = source.startMs;
     event.sourceEndMs = source.startMs + source.durationMs;
   });
 
-  onProgress({ stage: "ready", detail: "A playable private piano sketch is ready." });
+  onProgress({
+    stage: "ready",
+    detail: evidence.quality === "sketch" ? "A playable fallback sketch is ready." : "A locally transcribed piano arrangement is ready.",
+    fraction: 1,
+    method: analysisMethod,
+  });
   return {
     id: `import-${checksum}`,
     checksum,

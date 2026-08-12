@@ -7,10 +7,9 @@ describe("import stages", () => {
     expect(IMPORT_STAGE_SEQUENCE).toEqual([
       "preparing",
       "identifying",
-      "separating",
-      "lyrics",
-      "melody",
+      "transcribing",
       "arranging",
+      "enriching",
       "ready",
     ]);
   });

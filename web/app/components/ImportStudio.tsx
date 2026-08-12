@@ -76,6 +76,7 @@ export function ImportStudio({
     try {
       const localRecord = await analyze(file, setProgress);
       let finalRecord = localRecord;
+      setProgress({ stage: "enriching", detail: "Checking free metadata and lyric sources; the local arrangement is already safe.", fraction: 0.96, method: "online" });
       const controller = new AbortController();
       let enrichmentTimer: number | null = null;
       try {
@@ -91,7 +92,7 @@ export function ImportStudio({
       } finally {
         if (enrichmentTimer !== null) window.clearTimeout(enrichmentTimer);
       }
-      setProgress({ stage: "ready", detail: "Your private piano arrangement is ready." });
+      setProgress({ stage: "ready", detail: "Your private piano arrangement is ready.", fraction: 1 });
       setRecord(finalRecord);
       onImported(finalRecord);
     } catch (reason) {
@@ -149,7 +150,15 @@ export function ImportStudio({
       {busy && progress && (
         <div className="import-progress" role="status">
           <span>{IMPORT_STAGE_LABELS[progress.stage]}</span>
-          <i><b /></i>
+          <i
+            role="progressbar"
+            aria-label="Local analysis progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round((progress.fraction ?? 0) * 100)}
+          >
+            <b style={{ width: `${Math.round((progress.fraction ?? 0) * 100)}%` }} />
+          </i>
           <small>{progress.detail}</small>
         </div>
       )}

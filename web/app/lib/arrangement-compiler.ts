@@ -13,6 +13,9 @@ export interface LyricEvidence {
 
 export interface InstrumentalEvidence {
   notes: string[];
+  durationMs?: number;
+  kind?: "tap" | "hold";
+  holdMs?: number;
   velocity?: number;
   confidence?: number;
   provenance?: string[];
@@ -74,7 +77,8 @@ export function compileArrangement(input: ArrangementInput): SongPackage {
       notes: stableNotes,
       note: stableNotes[0],
       velocity: item.velocity ?? 88,
-      kind: "tap",
+      kind: item.kind ?? "tap",
+      holdMs: item.kind === "hold" ? item.holdMs ?? item.durationMs : undefined,
       confidence: item.confidence ?? 0.55,
       provenance: item.provenance ?? ["browser-sketch"],
     });

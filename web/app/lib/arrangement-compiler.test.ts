@@ -53,4 +53,21 @@ describe("arrangement compiler", () => {
     expect(song.events[9].targetCode).toBe("Digit0");
     expect(song.events[10].targetCode).toBe("Digit0");
   });
+
+  it("preserves imported note duration as a tap or required hold", () => {
+    const song = compileArrangement({
+      id: "timed",
+      title: "Timed",
+      lyricLanguage: "en",
+      lyrics: [],
+      instrumental: [
+        { notes: ["C4"], durationMs: 280, kind: "tap" },
+        { notes: ["D4", "F4"], durationMs: 940, kind: "hold", holdMs: 940 },
+      ],
+    });
+
+    expect(song.events[0].kind).toBe("tap");
+    expect(song.events[0].holdMs).toBeUndefined();
+    expect(song.events[1]).toMatchObject({ kind: "hold", holdMs: 940 });
+  });
 });

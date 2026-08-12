@@ -3,35 +3,34 @@ import type { SongPackage } from "../lib/song";
 export type ImportStage =
   | "preparing"
   | "identifying"
-  | "separating"
-  | "lyrics"
-  | "melody"
+  | "transcribing"
   | "arranging"
+  | "enriching"
   | "ready";
 
 export const IMPORT_STAGE_SEQUENCE: readonly ImportStage[] = [
   "preparing",
   "identifying",
-  "separating",
-  "lyrics",
-  "melody",
+  "transcribing",
   "arranging",
+  "enriching",
   "ready",
 ];
 
 export const IMPORT_STAGE_LABELS: Record<ImportStage, string> = {
   preparing: "PREPARING THE RECORDING",
   identifying: "IDENTIFYING THE SONG",
-  separating: "SEPARATING VOICE AND INSTRUMENTS",
-  lyrics: "ALIGNING THE LYRICS",
-  melody: "TRACING THE MELODY",
+  transcribing: "TRANSCRIBING NOTES ON THIS DEVICE",
   arranging: "ARRANGING FOR PIANO",
+  enriching: "CHECKING FREE SONG DETAILS",
   ready: "READY TO PERFORM",
 };
 
 export interface ImportProgress {
   stage: ImportStage;
   detail: string;
+  fraction?: number;
+  method?: "neural" | "fallback" | "online";
 }
 
 export interface ImportedMetadata {
