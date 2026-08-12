@@ -1,57 +1,63 @@
 import type { PianoVoice } from "../lib/song";
-import { getPianoVoiceProfile } from "./piano-voices";
+import { getPianoVoiceProfile, PIANO_VOICE_ORDER } from "./piano-voices";
 
-type ToneSampler = import("tone").Sampler;
+export interface PianoAttackHandle {
+  id: number;
+  voice: PianoVoice;
+  notes: readonly string[];
+}
 
 export interface PianoPort {
   load(): Promise<void>;
   resume(): Promise<void>;
   setVoice(voice: PianoVoice): void;
   tailMs(): number;
-  attack(note: string, velocity: number): void;
-  release(note: string): void;
+  attack(notes: readonly string[], velocity: number): PianoAttackHandle;
+  release(handle: PianoAttackHandle): void;
   releaseAll(): void;
   dispose(): void;
 }
 
-interface SamplerPort {
-  triggerAttack(note: string, time?: number, velocity?: number): unknown;
-  triggerRelease(note: string): unknown;
-  releaseAll(): unknown;
-  dispose(): unknown;
+export interface PianoVoiceChannel {
+  attack(notes: readonly string[], normalizedVelocity: number): void;
+  release(notes: readonly string[]): void;
+  releaseAll(): void;
+  dispose(): void;
 }
 
 interface PianoEngineDependencies {
-  sampler: SamplerPort;
+  channels: Record<PianoVoice, PianoVoiceChannel>;
   load: () => Promise<void>;
   resume: () => Promise<void>;
-  configureVoice?: (voice: PianoVoice) => void;
 }
 
 export function createPianoEngine(dependencies: PianoEngineDependencies): PianoPort {
-  const { sampler, load, resume, configureVoice } = dependencies;
-  let currentVoice: PianoVoice = "warm";
+  const { channels, load, resume } = dependencies;
+  let activeVoice: PianoVoice = "warm";
+  let nextHandleId = 1;
+
   return {
     load,
     resume,
     setVoice(voice) {
-      currentVoice = voice;
-      configureVoice?.(voice);
+      activeVoice = voice;
     },
     tailMs() {
-      return getPianoVoiceProfile(currentVoice).tailMs;
+      return getPianoVoiceProfile(activeVoice).tailMs;
     },
-    attack(note, velocity) {
-      sampler.triggerAttack(note, undefined, Math.min(1, Math.max(0, velocity / 127)));
+    attack(notes, velocity) {
+      const stableNotes = [...notes];
+      channels[activeVoice].attack(stableNotes, Math.min(1, Math.max(0, velocity / 127)));
+      return { id: nextHandleId++, voice: activeVoice, notes: stableNotes };
     },
-    release(note) {
-      sampler.triggerRelease(note);
+    release(handle) {
+      channels[handle.voice].release(handle.notes);
     },
     releaseAll() {
-      sampler.releaseAll();
+      for (const channel of Object.values(channels)) channel.releaseAll();
     },
     dispose() {
-      sampler.dispose();
+      for (const channel of Object.values(channels)) channel.dispose();
     },
   };
 }
@@ -73,78 +79,81 @@ const SAMPLE_URLS = {
   C6: "C6.mp3",
 };
 
+type ToneSampler = import("tone").Sampler;
+type ToneFilter = import("tone").Filter;
+type ToneReverb = import("tone").Reverb;
+
+interface LoadedVoice {
+  sampler: ToneSampler;
+  filter: ToneFilter;
+  reverb: ToneReverb;
+}
+
 export function createBrowserPianoEngine(): PianoPort {
-  let sampler: SamplerPort | null = null;
-  let disposeEffects: (() => void) | null = null;
+  const loaded = new Map<PianoVoice, LoadedVoice>();
   let toneModule: typeof import("tone") | null = null;
   let loading: Promise<void> | null = null;
-  let currentVoice: PianoVoice = "warm";
-  let configureLoadedVoice: ((voice: PianoVoice) => void) | null = null;
+
+  const channels = Object.fromEntries(
+    PIANO_VOICE_ORDER.map((voice) => [
+      voice,
+      {
+        attack(notes: readonly string[], normalizedVelocity: number) {
+          loaded.get(voice)?.sampler.triggerAttack([...notes], undefined, normalizedVelocity);
+        },
+        release(notes: readonly string[]) {
+          loaded.get(voice)?.sampler.triggerRelease([...notes]);
+        },
+        releaseAll() {
+          loaded.get(voice)?.sampler.releaseAll();
+        },
+        dispose() {
+          const chain = loaded.get(voice);
+          chain?.sampler.dispose();
+          chain?.filter.dispose();
+          chain?.reverb.dispose();
+          loaded.delete(voice);
+        },
+      } satisfies PianoVoiceChannel,
+    ]),
+  ) as Record<PianoVoice, PianoVoiceChannel>;
 
   const load = async () => {
     if (loading) return loading;
     loading = (async () => {
       const Tone = await import("tone");
       toneModule = Tone;
-      const initialProfile = getPianoVoiceProfile(currentVoice);
-      const reverb = new Tone.Reverb({
-        decay: initialProfile.reverbDecay,
-        preDelay: initialProfile.preDelay,
-        wet: initialProfile.wet,
-      }).toDestination();
-      const filter = new Tone.Filter({ frequency: 4300, type: "lowpass", rolloff: -12 }).connect(reverb);
-      sampler = new Tone.Sampler({
-        urls: SAMPLE_URLS,
-        baseUrl: "/audio/salamander/",
-        attack: 0.004,
-        release: initialProfile.samplerRelease,
-      }).connect(filter);
-      configureLoadedVoice = (voice) => {
+      for (const voice of PIANO_VOICE_ORDER) {
         const profile = getPianoVoiceProfile(voice);
-        filter.frequency.value = profile.cutoff;
-        reverb.wet.value = profile.wet;
-        reverb.decay = profile.reverbDecay;
-        reverb.preDelay = profile.preDelay;
-        if (sampler) (sampler as ToneSampler).release = profile.samplerRelease;
-      };
-      configureLoadedVoice(currentVoice);
-      disposeEffects = () => {
-        filter.dispose();
-        reverb.dispose();
-      };
+        const reverb = new Tone.Reverb({
+          decay: profile.reverbDecay,
+          preDelay: profile.preDelay,
+          wet: profile.wet,
+        }).toDestination();
+        const filter = new Tone.Filter({
+          frequency: profile.cutoff,
+          type: "lowpass",
+          rolloff: -12,
+        }).connect(reverb);
+        const sampler = new Tone.Sampler({
+          urls: SAMPLE_URLS,
+          baseUrl: "/audio/salamander/",
+          attack: 0.004,
+          release: profile.samplerRelease,
+        }).connect(filter);
+        loaded.set(voice, { sampler, filter, reverb });
+      }
       await Tone.loaded();
     })();
     return loading;
   };
 
-  return {
+  return createPianoEngine({
+    channels,
     load,
     async resume() {
       if (!toneModule) toneModule = await import("tone");
       await toneModule.start();
     },
-    setVoice(voice) {
-      currentVoice = voice;
-      configureLoadedVoice?.(voice);
-    },
-    tailMs() {
-      return getPianoVoiceProfile(currentVoice).tailMs;
-    },
-    attack(note, velocity) {
-      sampler?.triggerAttack(note, undefined, Math.min(1, Math.max(0, velocity / 127)));
-    },
-    release(note) {
-      sampler?.triggerRelease(note);
-    },
-    releaseAll() {
-      sampler?.releaseAll();
-    },
-    dispose() {
-      sampler?.dispose();
-      disposeEffects?.();
-      sampler = null;
-      disposeEffects = null;
-      configureLoadedVoice = null;
-    },
-  };
+  });
 }
