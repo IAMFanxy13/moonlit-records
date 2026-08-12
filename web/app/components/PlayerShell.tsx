@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { PianoPort } from "../audio/piano-engine";
+import type { PianoAttackHandle, PianoPort } from "../audio/piano-engine";
 import { getPianoVoiceProfile, PIANO_VOICE_ORDER } from "../audio/piano-voices";
 import { isPlayableCode, labelForCode } from "../lib/keyboard";
 import {
   createPlayerState,
   finishRinging,
   pressKey,
+  releaseKey,
   restartPlayer,
   rewindPhrase,
   startPlayer,
@@ -36,7 +37,8 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   const [feedback, setFeedback] = useState<KeyFeedback | null>(null);
   const [pressedCodes, setPressedCodes] = useState<Set<string>>(() => new Set());
   const [voice, setVoice] = useState<PianoVoice>(song.recommendedPiano);
-  const attackedNotes = useRef(new Map<string, string>());
+  const [earlyHold, setEarlyHold] = useState(false);
+  const attackedHandles = useRef(new Map<string, PianoAttackHandle>());
   const completedOnce = useRef(false);
   const completionTimer = useRef<number | null>(null);
 
@@ -45,7 +47,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
   const releaseEverything = useCallback(() => {
     piano.releaseAll();
-    attackedNotes.current.clear();
+    attackedHandles.current.clear();
     setPressedCodes(new Set());
   }, [piano]);
 
@@ -86,17 +88,21 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || isTypingTarget(event.target) || !isPlayableCode(event.code)) return;
+      if (
+        event.repeat ||
+        attackedHandles.current.has(event.code) ||
+        isTypingTarget(event.target) ||
+        !isPlayableCode(event.code)
+      ) return;
       event.preventDefault();
       setPressedCodes((current) => new Set(current).add(event.code));
 
       setPlayerState((current) => {
-        const result = pressKey(current, song, event.code);
+        const result = pressKey(current, song, event.code, event.timeStamp);
         if (result.sound) {
-          const previousNote = attackedNotes.current.get(event.code);
-          if (previousNote) piano.release(previousNote);
-          piano.attack(result.sound.note, result.sound.velocity);
-          attackedNotes.current.set(event.code, result.sound.note);
+          const handle = piano.attack(result.sound.notes, result.sound.velocity);
+          attackedHandles.current.set(event.code, handle);
+          setEarlyHold(false);
           setFeedback({ code: event.code, kind: result.sound.kind });
         }
         return result.state;
@@ -104,11 +110,17 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      const note = attackedNotes.current.get(event.code);
-      if (note) {
-        piano.release(note);
-        attackedNotes.current.delete(event.code);
+      const handle = attackedHandles.current.get(event.code);
+      if (handle) {
+        piano.release(handle);
+        attackedHandles.current.delete(event.code);
       }
+      setPlayerState((current) => {
+        const result = releaseKey(current, song, event.code, event.timeStamp);
+        if (result.holdResult === "early") setEarlyHold(true);
+        if (result.holdResult === "complete") setEarlyHold(false);
+        return result.state;
+      });
       setPressedCodes((current) => {
         if (!current.has(event.code)) return current;
         const next = new Set(current);
@@ -143,12 +155,13 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   const feedbackCopy = useMemo(() => {
     if (playerState.status === "ringing") return "LET IT RING";
     if (playerState.status === "paused") return "Paused — the keyboard remains open for free play.";
+    if (earlyHold) return "Release was early — press and hold the illuminated key once more.";
     if (feedback?.kind === "wrong" && currentEvent) {
       return `${labelForCode(feedback.code)} is free play. ${labelForCode(currentEvent.targetCode)} is still waiting.`;
     }
     if (feedback?.kind === "correct") return "That is the note — let it breathe.";
     return "Follow the illuminated initial. Every other key remains your piano.";
-  }, [currentEvent, feedback, playerState.status]);
+  }, [currentEvent, earlyHold, feedback, playerState.status]);
 
   const handleVoiceChange = (nextVoice: PianoVoice) => {
     setVoice(nextVoice);
@@ -163,6 +176,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     cancelCompletionTimer();
     releaseEverything();
     completedOnce.current = false;
+    setEarlyHold(false);
     setFeedback(null);
     setPlayerState((current) => startPlayer(restartPlayer(current)));
   };

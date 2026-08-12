@@ -8,12 +8,13 @@ import { MoonlitPiano } from "./MoonlitPiano";
 describe("MoonlitPiano", () => {
   it("loads a searched song, asks for one intentional entrance, and opens the player", async () => {
     const user = userEvent.setup();
+    let handleId = 1;
     const piano: PianoPort = {
       load: vi.fn().mockResolvedValue(undefined),
       resume: vi.fn().mockResolvedValue(undefined),
       setVoice: vi.fn(),
       tailMs: vi.fn(() => 5900),
-      attack: vi.fn(),
+      attack: vi.fn((notes) => ({ id: handleId++, voice: "warm", notes: [...notes] })),
       release: vi.fn(),
       releaseAll: vi.fn(),
       dispose: vi.fn(),

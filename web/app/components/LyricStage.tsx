@@ -69,6 +69,16 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
             );
           })}
         </div>
+        {currentEvent?.kind === "hold" && (
+          <div
+            className="hold-rail"
+            aria-label="Hold this key"
+            style={{ "--hold-ms": `${currentEvent.holdMs ?? 0}ms` } as React.CSSProperties}
+          >
+            <i />
+            <span>HOLD · RELEASE WITH THE PHRASE</span>
+          </div>
+        )}
       </div>
 
       <div className="next-lyric">
