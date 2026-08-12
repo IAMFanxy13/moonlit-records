@@ -13,10 +13,15 @@ export interface PlayerState {
   eventIndex: number;
   correctCount: number;
   mistakes: Mistake[];
+  activeHold: {
+    eventIndex: number;
+    code: string;
+    startedAt: number;
+  } | null;
 }
 
 export interface PianoSound {
-  note: string;
+  notes: string[];
   velocity: number;
   kind: "correct" | "wrong" | "free";
 }
@@ -27,7 +32,7 @@ export interface KeyResult {
 }
 
 export function createPlayerState(_song: SongPackage): PlayerState {
-  return { status: "ready", eventIndex: 0, correctCount: 0, mistakes: [] };
+  return { status: "ready", eventIndex: 0, correctCount: 0, mistakes: [], activeHold: null };
 }
 
 export function startPlayer(state: PlayerState): PlayerState {
@@ -35,13 +40,13 @@ export function startPlayer(state: PlayerState): PlayerState {
 }
 
 export function togglePause(state: PlayerState): PlayerState {
-  if (state.status === "playing") return { ...state, status: "paused" };
+  if (state.status === "playing") return { ...state, status: "paused", activeHold: null };
   if (state.status === "paused") return { ...state, status: "playing" };
   return state;
 }
 
 export function restartPlayer(_state: PlayerState): PlayerState {
-  return { status: "ready", eventIndex: 0, correctCount: 0, mistakes: [] };
+  return { status: "ready", eventIndex: 0, correctCount: 0, mistakes: [], activeHold: null };
 }
 
 export function finishRinging(state: PlayerState): PlayerState {
@@ -58,16 +63,33 @@ export function rewindPhrase(state: PlayerState, song: SongPackage): PlayerState
     eventIndex: startEvent,
     correctCount: startEvent,
     mistakes: state.mistakes.filter((mistake) => mistake.eventIndex < startEvent),
+    activeHold: null,
   };
 }
 
-export function pressKey(state: PlayerState, song: SongPackage, code: string): KeyResult {
+function advance(state: PlayerState, song: SongPackage): PlayerState {
+  const nextEventIndex = state.eventIndex + 1;
+  return {
+    ...state,
+    eventIndex: nextEventIndex,
+    correctCount: state.correctCount + 1,
+    activeHold: null,
+    status: nextEventIndex === song.events.length ? "ringing" : "playing",
+  };
+}
+
+export function pressKey(
+  state: PlayerState,
+  song: SongPackage,
+  code: string,
+  now = Date.now(),
+): KeyResult {
   if (!isPlayableCode(code) || state.status === "complete") return { state, sound: null };
 
   if (state.status !== "playing") {
     return {
       state,
-      sound: { note: defaultNoteFor(code), velocity: 78, kind: "free" },
+      sound: { notes: [defaultNoteFor(code)], velocity: 78, kind: "free" },
     };
   }
 
@@ -88,18 +110,48 @@ export function pressKey(state: PlayerState, song: SongPackage, code: string): K
           },
         ],
       },
-      sound: { note: defaultNoteFor(code), velocity: 82, kind: "wrong" },
+      sound: { notes: [defaultNoteFor(code)], velocity: 82, kind: "wrong" },
     };
   }
 
-  const nextEventIndex = state.eventIndex + 1;
+  if (currentEvent.kind === "hold") {
+    if (state.activeHold) return { state, sound: null };
+    return {
+      state: {
+        ...state,
+        activeHold: { eventIndex: state.eventIndex, code, startedAt: now },
+      },
+      sound: { notes: currentEvent.notes, velocity: currentEvent.velocity, kind: "correct" },
+    };
+  }
+
   return {
-    state: {
-      ...state,
-      eventIndex: nextEventIndex,
-      correctCount: state.correctCount + 1,
-      status: nextEventIndex === song.events.length ? "ringing" : "playing",
-    },
-    sound: { note: currentEvent.note, velocity: currentEvent.velocity, kind: "correct" },
+    state: advance(state, song),
+    sound: { notes: currentEvent.notes, velocity: currentEvent.velocity, kind: "correct" },
   };
+}
+
+export interface ReleaseResult {
+  state: PlayerState;
+  holdResult: "early" | "complete" | null;
+}
+
+export function releaseKey(
+  state: PlayerState,
+  song: SongPackage,
+  code: string,
+  now = Date.now(),
+): ReleaseResult {
+  const hold = state.activeHold;
+  if (!hold || hold.code !== code || hold.eventIndex !== state.eventIndex) {
+    return { state, holdResult: null };
+  }
+
+  const event = song.events[state.eventIndex];
+  const minimumHoldMs = Math.max(0, event?.holdMs ?? 0);
+  if (now - hold.startedAt < minimumHoldMs) {
+    return { state: { ...state, activeHold: null }, holdResult: "early" };
+  }
+
+  return { state: advance(state, song), holdResult: "complete" };
 }
