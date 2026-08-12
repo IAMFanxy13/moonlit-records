@@ -30,10 +30,12 @@ Unsupported, silent, oversized, and excessively long files remain explicit error
 
 ## Rhythm Guide
 
-The player gains a compact note highway between the KTV lyric stage and the performance status. Imported numeric arrangements show ten lanes; lyric-initial arrangements show twenty-six alphabet lanes. The current event sits on a gold judgment line and upcoming events appear above it, positioned by source-time distance when available and ordinal distance otherwise.
+The player keeps the compact note highway for upcoming-key orientation, but duration countdown belongs to one shared horizontal energy bar in the lower performance area immediately above the computer keyboard. Per-note highway blocks may show key and duration labels, but they do not animate individual countdown fills.
 
-Each note block is labelled with the required key. Its height represents duration. The current instruction says `TAP` for a short note or `HOLD 1.2s` for a hold. While the correct hold key is physically down, a fill travels through the block for exactly `holdMs`; releasing early resets the fill and leaves the same event waiting. The guide itself never advances by clock time.
+At every new event the shared bar is full and labelled with the required key plus suggested duration. It remains completely still until the correct current key is physically pressed. While that key remains down, the bar drains linearly for the printed duration and stays empty if the player continues holding. Releasing at any moment advances to the next event and refills the bar; the bar is guidance only and never grades, blocks, fails, or automatically advances the performance. Wrong and improvised keys sound normally but do not drain the shared bar.
+
+Chinese lyrics are tokenized one Han character at a time and map to uppercase pinyin initials. English lyrics are tokenized one word at a time and map to uppercase word initials. Printed rests consume no lyric token. When one lyric token spans multiple melody notes, its keyboard initial repeats; passages with no lyric token use the repeating numeric route.
 
 ## Testing
 
-Pure conversion tests cover onset grouping, chord reduction, duration preservation, and hold classification. Analyzer tests inject a transcription function to prove that real duration evidence reaches song events, that progress is truthful, and that failures visibly fall back. Component tests verify ten numeric lanes, source-time ordering, duration labels, active hold state, and integration with the existing player state machine. Full unit, type, lint, build, rendered-HTML, and local-browser checks finish the change.
+Pure conversion tests cover lyric tokenization, rest alignment, repeated-note syllables, onset grouping, chord reduction, duration preservation, and hold classification. Component tests verify that the shared bar starts full, drains only for the correct held key, refills on the next event, and never judges release timing. Full unit, type, lint, build, rendered-HTML, and local-browser checks finish the change.

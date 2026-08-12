@@ -60,7 +60,7 @@
 - [ ] Run the focused tests and verify they pass.
 - [ ] Commit the analyzer and progress changes.
 
-### Task 3: Rhythm Guide Projection and Component
+### Task 3: Shared Rhythm Guide and Lyric-Key Alignment
 
 **Files:**
 - Create: `web/app/components/RhythmGuide.test.tsx`
@@ -68,14 +68,18 @@
 - Modify: `web/app/components/PlayerShell.test.tsx`
 - Modify: `web/app/components/PlayerShell.tsx`
 - Modify: `web/app/globals.css`
+- Modify: `web/app/import/jianpu-parser.test.ts`
+- Modify: `web/app/import/jianpu-parser.ts`
 
 **Interfaces:**
-- `RhythmGuide({ song, eventIndex, pressedCodes })` renders the current and upcoming event window.
+- `RhythmGuide({ song, eventIndex, pressedCodes })` renders upcoming keys plus one shared lower duration bar.
 
-- [ ] Write failing component tests proving numeric arrangements show ten lanes, a 1,200 ms hold is labelled `HOLD 1.2s`, upcoming positions use source timing, and the current block becomes active only while its key is down.
-- [ ] Run the focused tests and verify failure because `RhythmGuide` does not exist.
-- [ ] Implement the pure event projection, accessible note highway, hold fill, judgment line, and compact responsive styling.
-- [ ] Mount the guide in `PlayerShell` and pass its physical-key state.
+- [ ] Write failing parser tests proving spaced Chinese lyrics become individual characters, rests consume no character, repeated-note syllables repeat their initial, and English words remain whole tokens.
+- [ ] Run `npx vitest run app/import/jianpu-parser.test.ts` and verify the new assertions fail against grouped lyric tokens.
+- [ ] Implement character/word tokenization and non-rest lyric distribution, then run the parser and compiler tests to green.
+- [ ] Write failing component tests proving a 1,200 ms shared bar is full before input, drains only while the correct current key is held, and resets full after release advances the event.
+- [ ] Move countdown animation out of per-note blocks into one accessible shared bar above the screen keyboard; retain the highway only for current/upcoming key orientation.
+- [ ] Mount the guide in `PlayerShell` with only the active correct hold code, so wrong, improvised, paused, and resting states cannot drain it.
 - [ ] Run the focused tests and verify they pass.
 - [ ] Commit the guide.
 
