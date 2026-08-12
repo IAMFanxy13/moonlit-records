@@ -12,11 +12,11 @@ An English-first, lyric-guided concert piano that turns a standard computer keyb
 - Hold a physical key to sustain its exact note and release that same key to begin the natural envelope. Independent held keys form real chords.
 - Continue improvising after the final lyric note. Completion waits until every held key is released and the selected hall tail has fully faded.
 
-## Printed-score atelier
+## Score-code atelier
 
-- Import one or more lyric-bearing Jianpu images (`PNG`, `JPEG`, `WEBP`) or a multi-page `PDF`.
-- Recognition runs entirely in the browser with bundled PaddleOCR, ONNX Runtime Web and PDF.js assets. No account, subscription or network connection is required.
-- A deterministic Jianpu compiler keeps every recognizable note even when part of a page is uncertain, derives lyric initials, and labels best-effort arrangements as estimated.
+- Paste declarative `MOONLIT-SCORE/1` code prepared from lyric-bearing Jianpu images or PDFs.
+- The website validates and compiles only this versioned music grammar; it never evaluates pasted script code.
+- The compiler derives Chinese pinyin initials and English word initials, preserves rests, chords, octaves and printed note lengths, and produces the same arrangement from the same code every time.
 - A note highway shows the next key, its literal hold length and silent rests. Tempo can be changed from 50–120 BPM without changing pitch.
 - Private imported scores can be renamed or permanently deleted from the repertoire.
 
@@ -48,8 +48,6 @@ npm run test:render
 npm run build
 ```
 
-## Audio, recognition and rights
+## Audio and rights
 
 The piano samples come from Salamander Grand Piano under CC BY 3.0; see `public/audio/ATTRIBUTION.md`. The included score fragments are original material or manually calibrated public-domain melodies. The application does not scrape or hotlink copyrighted lyrics or audio.
-
-PaddleOCR is Apache-2.0 licensed, PDF.js is Apache-2.0 licensed, and ONNX Runtime is MIT licensed. Their browser runtime and model assets are stored locally under `public/ocr` and `public/pdf`.

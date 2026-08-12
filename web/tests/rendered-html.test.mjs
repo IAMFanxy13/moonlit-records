@@ -20,9 +20,10 @@ test("server-renders the moonlit song catalog", async () => {
   const html = await response.text();
   assert.match(html, /<html lang="en"/);
   assert.match(html, /<title>Moonlit Records · Your Keyboard, in Concert<\/title>/i);
-  assert.match(html, /Bring your numbered score/);
-  assert.match(html, /Import score images or PDF/);
-  assert.match(html, /NO WI-FI REQUIRED · NO SUBSCRIPTION · YOUR PAGES STAY PRIVATE/);
+  assert.match(html, /Paste your score code/);
+  assert.match(html, /MOONLIT SCORE CODE/);
+  assert.match(html, /NO WI-FI REQUIRED · NO SCRIPT EXECUTION · SAVED ON THIS DEVICE/);
+  assert.doesNotMatch(html, /Import score images or PDF/);
   assert.match(html, /Twinkle, Twinkle, Little Star/);
   assert.match(html, /Search title, artist, or lyric/);
   assert.match(html, /http:\/\/localhost:3000\/og\.png/);

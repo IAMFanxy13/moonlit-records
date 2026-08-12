@@ -22,7 +22,7 @@ describe("SearchHome", () => {
     const onChoose = vi.fn();
     render(<SearchHome songs={builtinSongs} onChoose={onChoose} />);
 
-    expect(screen.getByRole("heading", { name: "Bring your numbered score" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Paste your score code" })).toBeInTheDocument();
     await user.type(screen.getByRole("searchbox", { name: "Search your library" }), "星星");
 
     expect(screen.getByText("Twinkle, Twinkle, Little Star")).toBeInTheDocument();
@@ -41,10 +41,10 @@ describe("SearchHome", () => {
     expect(screen.getByRole("heading", { name: "The night's repertoire" })).toBeInTheDocument();
   });
 
-  it("makes private score import more prominent than catalogue search", () => {
+  it("makes private score-code import more prominent than catalogue search", () => {
     render(<SearchHome songs={builtinSongs} onChoose={vi.fn()} />);
 
-    expect(screen.getByText("NO WI-FI REQUIRED · NO SUBSCRIPTION · YOUR PAGES STAY PRIVATE")).toBeInTheDocument();
+    expect(screen.getByText("NO WI-FI REQUIRED · NO SCRIPT EXECUTION · SAVED ON THIS DEVICE")).toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search your library" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Open Twinkle, Twinkle, Little Star/ })).toBeInTheDocument();
   });

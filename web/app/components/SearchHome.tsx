@@ -66,8 +66,8 @@ export function SearchHome({
 
       <section className="search-hero import-first-hero" id="top">
         <div className="hero-declaration">
-          <p className="eyebrow">YOUR SCORE, ARRANGED FOR THE KEYS</p>
-          <p className="hero-kicker">A private recital begins with printed music you already love.</p>
+          <p className="eyebrow">YOUR CODE, ARRANGED FOR THE KEYS</p>
+          <p className="hero-kicker">A private recital begins with a score prepared just for you.</p>
           <div className="hero-rule" aria-hidden="true"><i /><span>Ⅰ</span></div>
           <p className="hero-aside">Every piano sound waits for your hands. Hold the computer key as you would hold the piano key.</p>
         </div>
@@ -177,7 +177,7 @@ export function SearchHome({
           <div className="empty-catalog" role="status">
             <span aria-hidden="true">○</span>
             <p>No private arrangement carries that name yet.</p>
-            <small>Import the numbered score above and it will join this library.</small>
+            <small>Paste the score code above and it will join this library.</small>
           </div>
         )}
       </section>

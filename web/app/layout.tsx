@@ -4,7 +4,7 @@ import "./globals.css";
 export function buildMetadata(origin: string): Metadata {
   const normalizedOrigin = origin.replace(/\/$/, "");
   const title = "Moonlit Records · Your Keyboard, in Concert";
-  const description = "A private local piano that turns lyric-bearing Jianpu images or PDFs into expressive keyboard performances.";
+  const description = "A private local piano that performs declarative Moonlit Score Code prepared from your sheet music.";
 
   return {
     title,

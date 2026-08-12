@@ -12,7 +12,7 @@
 
 - Never execute pasted code.
 - Keep processing local and free.
-- Preserve the existing image/PDF fallback.
+- Remove image/PDF recognition from the website interface; Codex generates the code outside the site.
 - Use letters for lyric initials and the `1`-`0` cycle for lyric-free events.
 - One computer key may trigger one note or a reduced chord.
 
@@ -24,10 +24,10 @@
 - Create: `web/app/import/moonlit-score-code.test.ts`
 - Create: `web/app/import/moonlit-score-code.ts`
 
-- [ ] Write failing tests for metadata, Chinese/English initials, rests, chords, octaves, deterministic identity, and line-numbered validation.
-- [ ] Run the focused test and verify failure because the module does not exist.
-- [ ] Implement the bounded parser and compiler without evaluating input.
-- [ ] Run the focused test and verify it passes.
+- [x] Write failing tests for metadata, Chinese/English initials, rests, chords, octaves, deterministic identity, and line-numbered validation.
+- [x] Run the focused test and verify failure because the module does not exist.
+- [x] Implement the bounded parser and compiler without evaluating input.
+- [x] Run the focused test and verify it passes.
 
 ### Task 2: Paste Interface
 
@@ -36,18 +36,18 @@
 - Modify: `web/app/components/ImportStudio.tsx`
 - Modify: `web/app/globals.css`
 
-- [ ] Write failing component tests for successful paste/import and retained invalid input with actionable feedback.
-- [ ] Run the focused tests and verify the new controls are absent.
-- [ ] Add the tailored textarea, local compile action, ready card integration, and responsive styles.
-- [ ] Run focused component and integration tests to green.
+- [x] Write failing component tests for successful paste/import and retained invalid input with actionable feedback.
+- [x] Run the focused tests and verify the new controls are absent.
+- [x] Add the tailored textarea, local compile action, ready card integration, and responsive styles.
+- [x] Run focused component and integration tests to green.
 
 ### Task 3: Verification
 
 **Files:**
 - Modify only files required by failures caused by Tasks 1-2.
 
-- [ ] Run `npm test`.
-- [ ] Run `npx tsc --noEmit`.
-- [ ] Run `npm run lint`.
-- [ ] Run `npm run test:render`.
-- [ ] Paste a sample code block in `http://localhost:3000/`, verify it enters the private library, and open the performance screen.
+- [x] Run `npm test`.
+- [x] Run `npx tsc --noEmit`.
+- [x] Run `npm run lint`.
+- [x] Run `npm run test:render`.
+- [x] Paste a sample code block in `http://localhost:3000/`, verify it enters the private library, and open the performance screen.
