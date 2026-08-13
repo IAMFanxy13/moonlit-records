@@ -74,5 +74,42 @@ describe("compileJianpuSong", () => {
     expect(song.quality).toBe("sketch");
     expect(song.provenance).toContain("offline-jianpu-recognition");
   });
-});
 
+  test("compacts phrase indexes around leading and middle rest-only rows", () => {
+    const source = scoreFixture();
+    const rest = { raw: "0", degree: 0, octave: 0, beats: 1, rest: true, lyric: null, confidence: 0.9 };
+    const first = { raw: "1", degree: 1, octave: 0, beats: 1, rest: false, lyric: null, confidence: 0.9 };
+    const second = { raw: "2", degree: 2, octave: 0, beats: 1, rest: false, lyric: null, confidence: 0.9 };
+    source.rows = [
+      { id: "rest-leading", notationText: "0", lyricText: "", confidence: 0.9, notes: [rest] },
+      { id: "sound-first", notationText: "1", lyricText: "", confidence: 0.9, notes: [first] },
+      { id: "rest-middle", notationText: "0", lyricText: "", confidence: 0.9, notes: [rest] },
+      { id: "sound-second", notationText: "2", lyricText: "", confidence: 0.9, notes: [second] },
+    ];
+
+    const song = compileJianpuSong(source, "rested-score");
+
+    expect(song.events.map((event) => event.phraseIndex)).toEqual([0, 1]);
+    expect(song.phrases.map((phrase) => [phrase.startEvent, phrase.endEvent])).toEqual([
+      [0, 0],
+      [1, 1],
+    ]);
+    expect(song.events.map((event) => event.restBeforeMs)).toEqual([833, 833]);
+  });
+
+  test("rejects an all-rest score instead of returning an empty package", () => {
+    const source = scoreFixture();
+    source.rows = [{
+      id: "rest-only",
+      notationText: "0 0",
+      lyricText: "",
+      confidence: 0.9,
+      notes: [
+        { raw: "0", degree: 0, octave: 0, beats: 1, rest: true, lyric: null, confidence: 0.9 },
+        { raw: "0", degree: 0, octave: 0, beats: 1, rest: true, lyric: null, confidence: 0.9 },
+      ],
+    }];
+
+    expect(() => compileJianpuSong(source, "silent-score")).toThrow("at least one playable note");
+  });
+});

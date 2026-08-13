@@ -89,5 +89,19 @@ describe("analyzeScoreFiles", () => {
       }],
     })).rejects.toEqual(expect.objectContaining({ code: "NO_JIANPU" }));
   });
-});
 
+  test("blocks an all-rest score before it can become an empty song package", async () => {
+    const file = new File(["score"], "rests.png", { type: "image/png" });
+
+    await expect(analyzeScoreFiles([file], () => undefined, {
+      checksum: async () => "rests",
+      loadPages: async () => [],
+      recognizePages: async () => [{
+        id: "rests",
+        width: 500,
+        height: 500,
+        lines: [{ text: "0 0 0", role: "notation", top: 20, confidence: 0.9 }],
+      }],
+    })).rejects.toEqual(expect.objectContaining({ code: "NO_JIANPU" }));
+  });
+});

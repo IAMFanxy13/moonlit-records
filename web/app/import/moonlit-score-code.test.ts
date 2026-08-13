@@ -117,6 +117,45 @@ notes: ${notes}`);
     ]);
   });
 
+  it("compacts phrase indexes around leading and middle rest-only rows", () => {
+    const record = compileMoonlitScoreCode(`MOONLIT-SCORE/1
+title: Rested Interlude
+artist: Moonlit
+key: C
+meter: 4/4
+tempo: 60
+voice: upright
+
+line: Opening rest
+notes: 0:1
+line: First sound
+notes: 1:1
+line: Middle rest
+notes: 0:.5
+line: Second sound
+notes: 2:1`);
+
+    expect(record.song.events.map((event) => event.phraseIndex)).toEqual([0, 1]);
+    expect(record.song.phrases.map((phrase) => [phrase.startEvent, phrase.endEvent])).toEqual([
+      [0, 0],
+      [1, 1],
+    ]);
+    expect(record.song.events.map((event) => event.restBeforeMs)).toEqual([1_000, 500]);
+  });
+
+  it("rejects an all-rest score instead of creating an empty package", () => {
+    expect(() => compileMoonlitScoreCode(`MOONLIT-SCORE/1
+title: Silence
+artist: Moonlit
+key: C
+meter: 4/4
+tempo: 60
+voice: felt
+
+line: Rest
+notes: 0:4`)).toThrow("only rests");
+  });
+
   it("creates a deterministic identity from normalized code", () => {
     const first = compileMoonlitScoreCode(chineseCode, { now: "2026-08-12T12:00:00.000Z" });
     const second = compileMoonlitScoreCode(`${chineseCode}\n`, { now: "2026-08-12T13:00:00.000Z" });

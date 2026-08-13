@@ -247,7 +247,8 @@ export function compileMoonlitScoreCode(
   let fallbackIndex = 0;
   let hasChinese = false;
 
-  codePhrases.forEach((codePhrase, phraseIndex) => {
+  codePhrases.forEach((codePhrase) => {
+    const phraseIndex = phrases.length;
     const startEvent = events.length;
     let tokenIndex = 0;
     codePhrase.notes.forEach((codeNote) => {

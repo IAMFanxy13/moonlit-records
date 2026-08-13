@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PianoPort } from "../audio/piano-engine";
@@ -327,6 +328,32 @@ describe("PlayerShell", () => {
     expect(piano.keyUp).toHaveBeenCalledOnce();
   });
 
+  it("attacks once in StrictMode and releases the exact correct-note handle", () => {
+    const piano = fakePiano();
+    render(
+      <StrictMode>
+        <PlayerShell
+          song={builtinSongs[0]}
+          piano={piano}
+          onExit={vi.fn()}
+          onComplete={vi.fn()}
+        />
+      </StrictMode>,
+    );
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+
+    expect(screen.getByText("1 / 8")).toBeInTheDocument();
+    expect(piano.keyDown).toHaveBeenCalledOnce();
+    const attackedHandle = vi.mocked(piano.keyDown).mock.results[0].value;
+
+    fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    act(() => vi.advanceTimersByTime(2_400));
+
+    expect(piano.keyUp).toHaveBeenCalledOnce();
+    expect(piano.keyUp).toHaveBeenCalledWith(attackedHandle);
+  });
+
   it("supports pause without consuming a lyric step", () => {
     const piano = fakePiano();
     render(
@@ -425,6 +452,25 @@ describe("PlayerShell", () => {
     window.dispatchEvent(space);
     fireEvent.keyDown(window, { code: "Escape", key: "Escape" });
     expect(space.defaultPrevented).toBe(true);
+    expect(piano.keyDown).not.toHaveBeenCalled();
+    expect(screen.getByText("0 / 8")).toBeInTheDocument();
+  });
+
+  it("leaves Space default behavior available to a focused control", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+    const pause = screen.getByRole("button", { name: "Pause" });
+    pause.focus();
+    const space = new KeyboardEvent("keydown", {
+      code: "Space",
+      key: " ",
+      bubbles: true,
+      cancelable: true,
+    });
+
+    pause.dispatchEvent(space);
+
+    expect(space.defaultPrevented).toBe(false);
     expect(piano.keyDown).not.toHaveBeenCalled();
     expect(screen.getByText("0 / 8")).toBeInTheDocument();
   });

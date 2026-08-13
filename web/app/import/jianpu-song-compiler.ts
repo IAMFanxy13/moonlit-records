@@ -60,7 +60,8 @@ export function compileJianpuSong(score: ParsedJianpuScore, id: string): SongPac
   let pendingRestMs = 0;
   let fallbackIndex = 0;
 
-  score.rows.forEach((row, phraseIndex) => {
+  score.rows.forEach((row) => {
+    const phraseIndex = phrases.length;
     const startEvent = events.length;
     let tokenIndex = 0;
 
@@ -110,6 +111,10 @@ export function compileJianpuSong(score: ParsedJianpuScore, id: string): SongPac
     }
   });
 
+  if (events.length === 0) {
+    throw new Error("A Jianpu score must contain at least one playable note.");
+  }
+
   return {
     id,
     title: score.title,
@@ -126,4 +131,3 @@ export function compileJianpuSong(score: ParsedJianpuScore, id: string): SongPac
     events,
   };
 }
-

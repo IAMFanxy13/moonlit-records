@@ -57,6 +57,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   const normalizedSong = useMemo(() => normalizeSongPackage(song), [song]);
   const performanceSong = useMemo(() => scaleSongTempo(normalizedSong, tempo), [normalizedSong, tempo]);
   const [playerState, setPlayerState] = useState(() => startPlayer(createPlayerState(normalizedSong)));
+  const playerStateRef = useRef(playerState);
   const [feedback, setFeedback] = useState<KeyFeedback | null>(null);
   const [pressedCodes, setPressedCodes] = useState<Set<string>>(() => new Set());
   const [voice, setVoice] = useState<PianoVoice>(song.recommendedPiano);
@@ -70,6 +71,11 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   const completedRests = useRef(new Set<string>());
   const completedOnce = useRef(false);
   const completionTimer = useRef<number | null>(null);
+
+  const commitPlayerState = useCallback((next: PlayerState) => {
+    playerStateRef.current = next;
+    setPlayerState(next);
+  }, []);
 
   const currentEvent = performanceSong.events[playerState.eventIndex];
   const latestActiveHold = Object.values(playerState.activeHolds)
@@ -156,11 +162,11 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
     completionTimer.current = window.setTimeout(() => {
       completionTimer.current = null;
-      setPlayerState((current) => finishRinging(current));
+      commitPlayerState(finishRinging(playerStateRef.current));
     }, piano.tailMs());
 
     return cancelCompletionTimer;
-  }, [cancelCompletionTimer, piano, playerState.status, pressedCodes, resonantVoiceCount, voice]);
+  }, [cancelCompletionTimer, commitPlayerState, piano, playerState.status, pressedCodes, resonantVoiceCount, voice]);
 
   useEffect(() => {
     if (playerState.status === "complete" && !completedOnce.current) {
@@ -179,7 +185,6 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code === "Space") event.preventDefault();
       if (
         event.repeat ||
         attackedVoices.current.has(event.code) ||
@@ -189,44 +194,44 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
       event.preventDefault();
       setPressedCodes((current) => new Set(current).add(event.code));
 
-      setPlayerState((current) => {
-        if (isResting) {
-          if (isPlayableCode(event.code)) {
-            const notes = [defaultNoteFor(event.code)];
-            const handle = piano.keyDown(notes, 78);
-            attackedVoices.current.set(event.code, {
-              handle,
-              kind: "free",
-              eventIndex: null,
-              phraseIndex: null,
-              notes,
-            });
-            setFeedback({ code: event.code, kind: "free" });
-          }
-          return current;
-        }
-        const eventIndex = current.eventIndex;
-        const result = pressKey(current, performanceSong, event.code, event.timeStamp);
-        if (result.sound) {
-          if (result.sound.kind === "correct") {
-            applyResonanceTransition(
-              prepareAttack(resonance.current, performanceSong.events[eventIndex]),
-            );
-          }
-          const handle = piano.keyDown(result.sound.notes, result.sound.velocity);
+      if (isResting) {
+        if (isPlayableCode(event.code)) {
+          const notes = [defaultNoteFor(event.code)];
+          const handle = piano.keyDown(notes, 78);
           attackedVoices.current.set(event.code, {
             handle,
-            kind: result.sound.kind,
-            eventIndex: result.sound.kind === "correct" ? eventIndex : null,
-            phraseIndex: result.sound.kind === "correct"
-              ? performanceSong.events[eventIndex].phraseIndex
-              : null,
-            notes: result.sound.notes,
+            kind: "free",
+            eventIndex: null,
+            phraseIndex: null,
+            notes,
           });
-          setFeedback({ code: event.code, kind: result.sound.kind });
+          setFeedback({ code: event.code, kind: "free" });
         }
-        return result.state;
-      });
+        return;
+      }
+
+      const current = playerStateRef.current;
+      const eventIndex = current.eventIndex;
+      const result = pressKey(current, performanceSong, event.code, event.timeStamp);
+      commitPlayerState(result.state);
+      if (result.sound) {
+        if (result.sound.kind === "correct") {
+          applyResonanceTransition(
+            prepareAttack(resonance.current, performanceSong.events[eventIndex]),
+          );
+        }
+        const handle = piano.keyDown(result.sound.notes, result.sound.velocity);
+        attackedVoices.current.set(event.code, {
+          handle,
+          kind: result.sound.kind,
+          eventIndex: result.sound.kind === "correct" ? eventIndex : null,
+          phraseIndex: result.sound.kind === "correct"
+            ? performanceSong.events[eventIndex].phraseIndex
+            : null,
+          notes: result.sound.notes,
+        });
+        setFeedback({ code: event.code, kind: result.sound.kind });
+      }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
@@ -250,10 +255,13 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
           piano.keyUp(played.handle);
         }
       }
-      setPlayerState((current) => {
-        const result = releaseKey(current, performanceSong, event.code, event.timeStamp);
-        return result.state;
-      });
+      const result = releaseKey(
+        playerStateRef.current,
+        performanceSong,
+        event.code,
+        event.timeStamp,
+      );
+      commitPlayerState(result.state);
       setPressedCodes((current) => {
         if (!current.has(event.code)) return current;
         const next = new Set(current);
@@ -264,7 +272,8 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
     const pauseForInterruption = () => {
       releaseEverything();
-      setPlayerState((current) => current.status === "playing"
+      const current = playerStateRef.current;
+      commitPlayerState(current.status === "playing"
         ? togglePause(current)
         : { ...current, activeHolds: {} });
     };
@@ -283,7 +292,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
       window.removeEventListener("blur", pauseForInterruption);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [applyResonanceTransition, isResting, performanceSong, piano, releaseEverything]);
+  }, [applyResonanceTransition, commitPlayerState, isResting, performanceSong, piano, releaseEverything]);
 
   const feedbackCopy = useMemo(() => {
     if (playerState.status === "ringing") return "LET IT RING";
@@ -302,7 +311,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
   const handlePause = () => {
     releaseEverything();
-    setPlayerState((current) => togglePause(current));
+    commitPlayerState(togglePause(playerStateRef.current));
   };
 
   const handleRestart = () => {
@@ -310,7 +319,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     completedOnce.current = false;
     completedRests.current.clear();
     setFeedback(null);
-    setPlayerState((current) => startPlayer(restartPlayer(current)));
+    commitPlayerState(startPlayer(restartPlayer(playerStateRef.current)));
   };
 
   const handleExit = () => {
@@ -405,7 +414,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
         <button type="button" onClick={() => {
           releaseEverything();
           completedRests.current.clear();
-          setPlayerState((current) => rewindPhrase(current, performanceSong));
+          commitPlayerState(rewindPhrase(playerStateRef.current, performanceSong));
         }}>↶ Replay this line</button>
         <span>Pinyin initials guide the melody; every key stays free.</span>
         <span>{getPianoVoiceProfile(voice).name} · SALAMANDER GRAND</span>

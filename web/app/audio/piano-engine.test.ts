@@ -1,8 +1,61 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createPianoEngine, type PianoVoiceChannel } from "./piano-engine";
+import { createBrowserPianoEngine, createPianoEngine, type PianoVoiceChannel } from "./piano-engine";
 import { getPianoVoiceProfile } from "./piano-voices";
 import type { PianoVoice } from "../lib/song";
+
+const tone = vi.hoisted(() => {
+  const reverbs: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
+  const filters: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
+  const samplers: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
+  const Reverb = vi.fn(function Reverb() {
+    const instance = {
+      dispose: vi.fn(),
+      toDestination() { return instance; },
+    };
+    reverbs.push(instance);
+    return instance;
+  });
+  const Filter = vi.fn(function Filter() {
+    const instance = {
+      dispose: vi.fn(),
+      connect() { return instance; },
+    };
+    filters.push(instance);
+    return instance;
+  });
+  const Sampler = vi.fn(function Sampler() {
+    const instance = {
+      _activeSources: new Map(),
+      dispose: vi.fn(),
+      releaseAll: vi.fn(),
+      triggerAttack: vi.fn(),
+      connect() { return instance; },
+    };
+    samplers.push(instance);
+    return instance;
+  });
+  return {
+    Filter,
+    Frequency: vi.fn(() => ({ toMidi: () => 60 })),
+    Reverb,
+    Sampler,
+    filters,
+    loaded: vi.fn(),
+    reverbs,
+    samplers,
+    start: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
+vi.mock("tone", () => ({
+  Filter: tone.Filter,
+  Frequency: tone.Frequency,
+  Reverb: tone.Reverb,
+  Sampler: tone.Sampler,
+  loaded: tone.loaded,
+  start: tone.start,
+}));
 
 function channel(): PianoVoiceChannel {
   return {
@@ -98,5 +151,29 @@ describe("piano engine", () => {
       expect(voice.releaseAll).toHaveBeenCalledOnce();
       expect(voice.dispose).toHaveBeenCalledOnce();
     }
+  });
+
+  it("disposes a failed browser load and rebuilds every voice on retry", async () => {
+    tone.Filter.mockClear();
+    tone.Reverb.mockClear();
+    tone.Sampler.mockClear();
+    tone.filters.length = 0;
+    tone.reverbs.length = 0;
+    tone.samplers.length = 0;
+    tone.loaded.mockReset()
+      .mockRejectedValueOnce(new Error("sample decode failed"))
+      .mockResolvedValueOnce(undefined);
+    const piano = createBrowserPianoEngine();
+
+    await expect(piano.load()).rejects.toThrow("sample decode failed");
+    const failedSamplers = [...tone.samplers];
+    const failedFilters = [...tone.filters];
+    const failedReverbs = [...tone.reverbs];
+
+    await expect(piano.load()).resolves.toBeUndefined();
+    expect(tone.Sampler).toHaveBeenCalledTimes(8);
+    failedSamplers.forEach((sampler) => expect(sampler.dispose).toHaveBeenCalledOnce());
+    failedFilters.forEach((filter) => expect(filter.dispose).toHaveBeenCalledOnce());
+    failedReverbs.forEach((reverb) => expect(reverb.dispose).toHaveBeenCalledOnce());
   });
 });

@@ -86,4 +86,60 @@ describe("MoonlitPiano", () => {
     expect(screen.queryByRole("button", { name: "Open Moon Room" })).not.toBeInTheDocument();
     expect(await library.get(saved.id)).toBeNull();
   });
+
+  it("keeps the prior title and reports a rejected private rename", async () => {
+    const user = userEvent.setup();
+    const saved: PrivateSongRecord = {
+      id: "import-rename-failure",
+      checksum: "rename-failure",
+      sourceName: "Rename.mp4",
+      createdAt: "2026-08-12T00:00:00.000Z",
+      metadata: { title: "Original Title", artist: "Private Artist" },
+      song: { ...builtinSongs[2], id: "import-rename-failure", title: "Original Title", artist: "Private Artist" },
+      warnings: [],
+    };
+    const storedLibrary = createMemoryPrivateLibrary([saved]);
+    const library = {
+      ...storedLibrary,
+      put: vi.fn().mockRejectedValue(new Error("storage unavailable")),
+    };
+    render(<MoonlitPiano privateLibrary={library} />);
+
+    await user.click(await screen.findByRole("button", { name: "Manage Original Title" }));
+    await user.click(screen.getByRole("button", { name: "Rename" }));
+    const input = screen.getByRole("textbox", { name: "Rename Original Title" });
+    await user.clear(input);
+    await user.type(input, "Unsaved Title");
+    await user.click(screen.getByRole("button", { name: "Save name" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not rename/i);
+    expect(screen.getByRole("button", { name: "Open Original Title" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Unsaved Title" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the private row and reports a rejected deletion", async () => {
+    const user = userEvent.setup();
+    const saved: PrivateSongRecord = {
+      id: "import-delete-failure",
+      checksum: "delete-failure",
+      sourceName: "Delete.mp4",
+      createdAt: "2026-08-12T00:00:00.000Z",
+      metadata: { title: "Keep This Song", artist: "Private Artist" },
+      song: { ...builtinSongs[2], id: "import-delete-failure", title: "Keep This Song", artist: "Private Artist" },
+      warnings: [],
+    };
+    const storedLibrary = createMemoryPrivateLibrary([saved]);
+    const library = {
+      ...storedLibrary,
+      remove: vi.fn().mockRejectedValue(new Error("storage unavailable")),
+    };
+    render(<MoonlitPiano privateLibrary={library} />);
+
+    await user.click(await screen.findByRole("button", { name: "Manage Keep This Song" }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Delete forever" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not delete/i);
+    expect(screen.getByRole("button", { name: "Open Keep This Song" })).toBeInTheDocument();
+  });
 });

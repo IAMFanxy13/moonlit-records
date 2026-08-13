@@ -11,6 +11,7 @@ interface SearchHomeProps {
   songs: SongPackage[];
   privateSongs?: SongPackage[];
   privateRecords?: PrivateSongRecord[];
+  libraryError?: string | null;
   onChoose: (song: SongPackage) => void;
   onImported?: (record: PrivateSongRecord) => void;
   onRenamePrivate?: (record: PrivateSongRecord, title: string) => void | Promise<void>;
@@ -26,6 +27,7 @@ export function SearchHome({
   songs,
   privateSongs = [],
   privateRecords = [],
+  libraryError = null,
   onChoose,
   onImported = () => undefined,
   onRenamePrivate = () => undefined,
@@ -82,6 +84,8 @@ export function SearchHome({
           </div>
           <span>{String(filteredItems.length).padStart(2, "0")} SCORES PREPARED</span>
         </div>
+
+        {libraryError && <p className="import-error" role="alert">{libraryError}</p>}
 
         <label className="song-search library-search">
           <span className="search-glyph" aria-hidden="true">⌕</span>

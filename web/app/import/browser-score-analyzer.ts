@@ -74,7 +74,7 @@ export async function analyzeScoreFiles(
   const parsed = parseJianpuPages(recognizedPages, {
     fallbackTitle: readableFilename(files[0]?.name ?? "Untitled Score"),
   });
-  if (parsed.rows.length === 0 || parsed.rows.every((row) => row.notes.length === 0)) {
+  if (!parsed.rows.some((row) => row.notes.some((note) => !note.rest))) {
     throw new ImportScoreError(
       "NO_JIANPU",
       "No numbered notation was found. Try a clearer crop with the 0–7 score rows visible.",

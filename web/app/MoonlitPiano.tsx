@@ -28,6 +28,7 @@ export function MoonlitPiano({ piano: injectedPiano, privateLibrary: injectedLib
   const [selectedSong, setSelectedSong] = useState<SongPackage | null>(null);
   const [finalState, setFinalState] = useState<PlayerState | null>(null);
   const [privateRecords, setPrivateRecords] = useState<PrivateSongRecord[]>([]);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
   const loadRequest = useRef(0);
 
   useEffect(() => () => {
@@ -55,6 +56,7 @@ export function MoonlitPiano({ piano: injectedPiano, privateLibrary: injectedLib
   const renamePrivateSong = async (record: PrivateSongRecord, title: string) => {
     const trimmed = title.trim();
     if (!trimmed) return;
+    setLibraryError(null);
     const updated: PrivateSongRecord = {
       ...record,
       metadata: { ...record.metadata, title: trimmed },
@@ -64,15 +66,17 @@ export function MoonlitPiano({ piano: injectedPiano, privateLibrary: injectedLib
       const stored = await privateLibrary.put(updated);
       setPrivateRecords((current) => current.map((item) => item.id === stored.id ? stored : item));
     } catch {
-      setPrivateRecords((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setLibraryError("Could not rename this private arrangement. Its saved title was not changed.");
     }
   };
 
   const deletePrivateSong = async (record: PrivateSongRecord) => {
+    setLibraryError(null);
     try {
       await privateLibrary.remove(record.id);
-    } finally {
       setPrivateRecords((current) => current.filter((item) => item.id !== record.id));
+    } catch {
+      setLibraryError("Could not delete this private arrangement. It remains in your library.");
     }
   };
 
@@ -112,6 +116,7 @@ export function MoonlitPiano({ piano: injectedPiano, privateLibrary: injectedLib
       <SearchHome
         songs={builtinSongs}
         privateRecords={privateRecords}
+        libraryError={libraryError}
         onImported={rememberImportedSong}
         onRenamePrivate={renamePrivateSong}
         onDeletePrivate={deletePrivateSong}

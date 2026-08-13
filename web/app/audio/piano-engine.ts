@@ -156,7 +156,7 @@ export function createBrowserPianoEngine(): PianoPort {
 
   const load = async () => {
     if (loading) return loading;
-    loading = (async () => {
+    const attempt = (async () => {
       const Tone = await import("tone");
       toneModule = Tone;
       for (const voice of PIANO_VOICE_ORDER) {
@@ -182,6 +182,12 @@ export function createBrowserPianoEngine(): PianoPort {
       }
       await Tone.loaded();
     })();
+    loading = attempt.catch((reason) => {
+      for (const channel of Object.values(channels)) channel.dispose();
+      toneModule = null;
+      loading = null;
+      throw reason;
+    });
     return loading;
   };
 
