@@ -92,17 +92,26 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     setResonantVoiceCount(transition.state.voices.length);
   }, [piano]);
 
-  const releaseEverything = useCallback(() => {
-    piano.releaseAll();
-    attackedVoices.current.clear();
-    setPressedCodes(new Set());
-  }, [piano]);
-
   const cancelCompletionTimer = useCallback(() => {
     if (completionTimer.current === null) return;
     window.clearTimeout(completionTimer.current);
     completionTimer.current = null;
   }, []);
+
+  const clearResonanceTimers = useCallback(() => {
+    resonanceTimers.current.forEach((timer) => window.clearTimeout(timer));
+    resonanceTimers.current.clear();
+  }, []);
+
+  const releaseEverything = useCallback(() => {
+    cancelCompletionTimer();
+    clearResonanceTimers();
+    resonance.current = clearResonance(resonance.current).state;
+    attackedVoices.current.clear();
+    piano.releaseAll();
+    setResonantVoiceCount(0);
+    setPressedCodes(new Set());
+  }, [cancelCompletionTimer, clearResonanceTimers, piano]);
 
   useEffect(() => {
     piano.setVoice(voice);
@@ -138,7 +147,12 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
   useEffect(() => {
     cancelCompletionTimer();
-    if (playerState.status !== "ringing" || pressedCodes.size > 0) return;
+    if (
+      playerState.status !== "ringing" ||
+      pressedCodes.size > 0 ||
+      attackedVoices.current.size > 0 ||
+      resonantVoiceCount > 0
+    ) return;
 
     completionTimer.current = window.setTimeout(() => {
       completionTimer.current = null;
@@ -146,7 +160,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     }, piano.tailMs());
 
     return cancelCompletionTimer;
-  }, [cancelCompletionTimer, piano, playerState.status, pressedCodes, voice]);
+  }, [cancelCompletionTimer, piano, playerState.status, pressedCodes, resonantVoiceCount, voice]);
 
   useEffect(() => {
     if (playerState.status === "complete" && !completedOnce.current) {
@@ -160,6 +174,8 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     const timer = window.setTimeout(() => setFeedback(null), 260);
     return () => window.clearTimeout(timer);
   }, [feedback]);
+
+  useEffect(() => releaseEverything, [releaseEverything]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -266,10 +282,8 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", pauseForInterruption);
       document.removeEventListener("visibilitychange", handleVisibility);
-      cancelCompletionTimer();
-      piano.releaseAll();
     };
-  }, [applyResonanceTransition, cancelCompletionTimer, isResting, performanceSong, piano, releaseEverything]);
+  }, [applyResonanceTransition, isResting, performanceSong, piano, releaseEverything]);
 
   const feedbackCopy = useMemo(() => {
     if (playerState.status === "ringing") return "LET IT RING";
@@ -292,7 +306,6 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   };
 
   const handleRestart = () => {
-    cancelCompletionTimer();
     releaseEverything();
     completedOnce.current = false;
     completedRests.current.clear();
@@ -301,7 +314,6 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   };
 
   const handleExit = () => {
-    cancelCompletionTimer();
     releaseEverything();
     onExit();
   };

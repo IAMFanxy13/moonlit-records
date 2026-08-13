@@ -119,6 +119,111 @@ describe("PlayerShell", () => {
     expect(screen.getByText("2 / 8")).toBeInTheDocument();
   });
 
+  it("expires a deferred correct voice after 2.4 seconds", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    act(() => vi.advanceTimersByTime(2_399));
+    expect(piano.keyUp).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(piano.keyUp).toHaveBeenCalledOnce();
+  });
+
+  it("releases an older source before retriggering the same piano pitch", () => {
+    const piano = fakePiano();
+    const base = builtinSongs[0];
+    const repeatedPitchSong = {
+      ...base,
+      phrases: [{ id: "same", text: "same", startEvent: 0, endEvent: 1 }],
+      events: [
+        { ...base.events[0], id: "first", targetCode: "KeyN", notes: ["C4"], note: "C4" },
+        { ...base.events[1], id: "second", targetCode: "KeyH", notes: ["C4"], note: "C4" },
+      ],
+    };
+    render(<PlayerShell song={repeatedPitchSong} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(piano.keyUp).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(piano.keyDown).mock.invocationCallOrder[1]);
+  });
+
+  it.each([
+    { name: "new phrase", boundary: { phraseIndex: 1 }, advanceRest: false },
+    { name: "printed rest", boundary: { restBeforeMs: 1 }, advanceRest: true },
+  ])("releases every deferred voice before a $name attack", ({ boundary, advanceRest }) => {
+    const piano = fakePiano();
+    const base = builtinSongs[0];
+    const boundarySong = {
+      ...base,
+      phrases: [
+        { id: "first-phrase", text: "first", startEvent: 0, endEvent: 1 },
+        { id: "second-phrase", text: "second", startEvent: 2, endEvent: 2 },
+      ],
+      events: [
+        { ...base.events[0], id: "boundary-a", phraseIndex: 0, targetCode: "KeyA", notes: ["C4"], note: "C4" },
+        { ...base.events[1], id: "boundary-b", phraseIndex: 0, targetCode: "KeyB", notes: ["D4"], note: "D4" },
+        {
+          ...base.events[2],
+          id: "boundary-c",
+          phraseIndex: 0,
+          targetCode: "KeyC",
+          notes: ["E4"],
+          note: "E4",
+          ...boundary,
+        },
+      ],
+    };
+    render(<PlayerShell song={boundarySong} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    ["KeyA", "KeyB"].forEach((code) => {
+      fireEvent.keyDown(window, { code, key: code.slice(-1).toLowerCase() });
+      fireEvent.keyUp(window, { code, key: code.slice(-1).toLowerCase() });
+    });
+    if (advanceRest) act(() => vi.advanceTimersByTime(1));
+    fireEvent.keyDown(window, { code: "KeyC", key: "c" });
+
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }));
+    expect(piano.keyUp).toHaveBeenCalledTimes(2);
+    const thirdAttackOrder = vi.mocked(piano.keyDown).mock.invocationCallOrder[2];
+    expect(vi.mocked(piano.keyUp).mock.invocationCallOrder[0]).toBeLessThan(thirdAttackOrder);
+    expect(vi.mocked(piano.keyUp).mock.invocationCallOrder[1]).toBeLessThan(thirdAttackOrder);
+  });
+
+  it("keeps at most four deferred gestures in one phrase", () => {
+    const piano = fakePiano();
+    const base = builtinSongs[0];
+    const capacitySong = {
+      ...base,
+      phrases: [{ id: "capacity", text: "capacity", startEvent: 0, endEvent: 4 }],
+      events: ["C4", "D4", "E4", "F4", "G4"].map((note, index) => ({
+        ...base.events[index],
+        id: `capacity-${index}`,
+        phraseIndex: 0,
+        tokenIndex: index,
+        targetCode: `Key${String.fromCharCode(65 + index)}`,
+        notes: [note],
+        note,
+      })),
+    };
+    render(<PlayerShell song={capacitySong} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    ["KeyA", "KeyB", "KeyC", "KeyD", "KeyE"].forEach((code) => {
+      fireEvent.keyDown(window, { code, key: code.slice(-1).toLowerCase() });
+      fireEvent.keyUp(window, { code, key: code.slice(-1).toLowerCase() });
+    });
+
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    expect(piano.keyUp).toHaveBeenCalledTimes(1);
+  });
+
   it("releases wrong and paused free-play keys immediately", () => {
     const piano = fakePiano();
     render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
@@ -182,12 +287,13 @@ describe("PlayerShell", () => {
 
     fireEvent.keyDown(window, { code: "KeyN", key: "n" });
     expect(screen.getByText("1 / 1")).toBeInTheDocument();
-
-    act(() => vi.advanceTimersByTime(12000));
-    expect(onComplete).not.toHaveBeenCalled();
-
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
     expect(screen.getByText("LET IT RING")).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(2_399));
+    expect(onComplete).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(piano.keyUp).toHaveBeenCalledOnce();
     act(() => vi.advanceTimersByTime(5899));
     expect(onComplete).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(1));
@@ -217,6 +323,7 @@ describe("PlayerShell", () => {
     expect(piano.keyDown).toHaveBeenCalledTimes(2);
 
     fireEvent.keyUp(window, { code: "KeyQ", key: "q" });
+    expect(piano.keyUp).toHaveBeenCalledTimes(2);
     act(() => vi.advanceTimersByTime(5900));
     expect(onComplete).toHaveBeenCalledOnce();
   });
@@ -309,6 +416,73 @@ describe("PlayerShell", () => {
     fireEvent.click(screen.getByRole("button", { name: /Replay this line/ }));
     expect(piano.releaseAll).toHaveBeenCalledTimes(3);
     expect(screen.getByText("0 / 8")).toBeInTheDocument();
+  });
+
+  it.each<{ name: string; trigger: (unmount: () => void) => void }>([
+    {
+      name: "pause",
+      trigger: () => {
+        fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+      },
+    },
+    {
+      name: "restart",
+      trigger: () => {
+        fireEvent.click(screen.getByRole("button", { name: "Restart" }));
+      },
+    },
+    {
+      name: "replay",
+      trigger: () => {
+        fireEvent.click(screen.getByRole("button", { name: /Replay this line/ }));
+      },
+    },
+    {
+      name: "exit",
+      trigger: () => {
+        fireEvent.click(screen.getByRole("button", { name: "Back to catalogue" }));
+      },
+    },
+    {
+      name: "blur",
+      trigger: () => {
+        fireEvent.blur(window);
+      },
+    },
+    {
+      name: "visibility loss",
+      trigger: () => {
+        const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+        fireEvent(document, new Event("visibilitychange"));
+        hidden.mockRestore();
+      },
+    },
+    {
+      name: "unmount",
+      trigger: (unmount: () => void) => {
+        unmount();
+      },
+    },
+  ])("cancels deferred-release timers on $name cleanup", ({ trigger }) => {
+    const piano = fakePiano();
+    const { unmount } = render(
+      <PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />,
+    );
+
+    [
+      { code: "KeyN", key: "n" },
+      { code: "KeyH", key: "h" },
+    ].forEach(({ code, key }) => {
+      fireEvent.keyDown(window, { code, key });
+      fireEvent.keyUp(window, { code, key });
+    });
+    expect(piano.keyUp).not.toHaveBeenCalled();
+
+    trigger(unmount);
+    expect(piano.releaseAll).toHaveBeenCalled();
+    const keyUpCallsAfterCleanup = vi.mocked(piano.keyUp).mock.calls.length;
+    act(() => vi.advanceTimersByTime(2_401));
+    expect(piano.keyUp).toHaveBeenCalledTimes(keyUpCallsAfterCleanup);
   });
 
   it("allows several free-play keys to sound and release independently while paused", () => {
