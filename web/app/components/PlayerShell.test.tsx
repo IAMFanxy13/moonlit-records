@@ -110,6 +110,20 @@ describe("PlayerShell", () => {
     expect(piano.keyUp).toHaveBeenCalledTimes(2);
   });
 
+  it("holds one non-looping sample for seconds without browser-repeat attacks", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    act(() => vi.advanceTimersByTime(5_000));
+    fireEvent.keyDown(window, { code: "KeyN", key: "n", repeat: true });
+    expect(piano.keyDown).toHaveBeenCalledOnce();
+    expect(piano.keyUp).not.toHaveBeenCalled();
+
+    fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    expect(piano.keyUp).toHaveBeenCalledOnce();
+  });
+
   it("supports pause without consuming a lyric step", () => {
     const piano = fakePiano();
     render(
@@ -249,6 +263,40 @@ describe("PlayerShell", () => {
     fireEvent.blur(window);
     expect(piano.releaseAll).toHaveBeenCalledTimes(2);
     expect(screen.getByText("Paused — the keyboard remains open for free play.")).toBeInTheDocument();
+  });
+
+  it("cleans multiple held voices on pause and replay line", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(piano.releaseAll).toHaveBeenCalledOnce();
+    expect(screen.getByText("2 / 8")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    fireEvent.keyDown(window, { code: "KeyZ", key: "z" });
+    fireEvent.click(screen.getByRole("button", { name: /Replay this line/ }));
+    expect(piano.releaseAll).toHaveBeenCalledTimes(3);
+    expect(screen.getByText("0 / 8")).toBeInTheDocument();
+  });
+
+  it("allows several free-play keys to sound and release independently while paused", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+
+    fireEvent.keyDown(window, { code: "KeyJ", key: "j" });
+    fireEvent.keyDown(window, { code: "KeyK", key: "k" });
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("0 / 8")).toBeInTheDocument();
+
+    fireEvent.keyUp(window, { code: "KeyJ", key: "j" });
+    expect(piano.keyUp).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("key-KeyK")).toHaveAttribute("data-state", "free");
+    fireEvent.keyUp(window, { code: "KeyK", key: "k" });
+    expect(piano.keyUp).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the duration rail as guidance after keydown cursor advancement", () => {

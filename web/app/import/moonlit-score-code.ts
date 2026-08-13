@@ -111,7 +111,7 @@ function codeNote(pitchText: string, beatText: string, lyric: string | null, lin
     return { pitches, beats, lyric, line };
 }
 
-function parseGroupedNotes(value: string, line: number): CodeNote[] {
+function parseGroupedNotes(value: string, line: number): { notes: CodeNote[]; consumed: number } {
   const close = value.indexOf("]");
   if (close < 0) throw new MoonlitScoreCodeError("A grouped lyric token needs a closing ].", line);
   const lyricMatch = value.slice(close + 1).match(/^\s*\{([^{}\r\n]+)\}/u);
@@ -135,7 +135,7 @@ function parseGroupedNotes(value: string, line: number): CodeNote[] {
   }
   if (notes.length === 0) throw new MoonlitScoreCodeError("A lyric note group cannot be empty.", line);
   const consumed = close + 1 + lyricMatch[0].length;
-  return Object.assign(notes, { consumed });
+  return { notes, consumed };
 }
 
 function parseNotes(value: string, line: number): CodeNote[] {
@@ -145,8 +145,8 @@ function parseNotes(value: string, line: number): CodeNote[] {
     const remaining = value.slice(cursor);
     if (/^\s*\[/u.test(remaining)) {
       const leading = remaining.match(/^\s*/u)?.[0].length ?? 0;
-      const grouped = parseGroupedNotes(remaining.slice(leading), line) as CodeNote[] & { consumed: number };
-      notes.push(...grouped);
+      const grouped = parseGroupedNotes(remaining.slice(leading), line);
+      notes.push(...grouped.notes);
       cursor += leading + grouped.consumed;
     } else {
       NOTE_AT.lastIndex = cursor;

@@ -6,17 +6,18 @@ An English-first, lyric-guided concert piano that turns a standard computer keyb
 
 - Search the curated catalogue by English display metadata or hidden Chinese aliases.
 - Play every safe keyboard key freely at any time; each key owns a stable default piano note.
-- Follow Chinese pinyin initials or English word initials to play a song melody through familiar typing gestures.
+- Follow Chinese pinyin initials or English word initials to play a song melody through familiar typing gestures. If one lyric token owns several melody notes, play its initial once and use fresh Space presses for the continuation notes.
 - See KTV-style current and next lyric lines, with the required key illuminated on a full screen keyboard.
 - Hear wrong keys as ordinary free-play notes. They mark red but do not advance the lyric; the expected key continues waiting.
-- Hold a physical key to sustain its exact note and release that same key to begin the natural envelope. Independent held keys form real chords.
+- A correct physical keydown sounds the note and opens the next score event immediately. Keyup only releases that physical key, so independent held keys can overlap for legato or form real chords.
+- The duration rail is guidance only: it begins draining when the key is pressed, but early release and over-holding are both allowed and never scored.
 - Continue improvising after the final lyric note. Completion waits until every held key is released and the selected hall tail has fully faded.
 
 ## Score-code atelier
 
 - Paste declarative `MOONLIT-SCORE/1` code prepared from lyric-bearing Jianpu images or PDFs.
 - The website validates and compiles only this versioned music grammar; it never evaluates pasted script code.
-- The compiler derives Chinese pinyin initials and English word initials, preserves rests, chords, octaves and printed note lengths, and produces the same arrangement from the same code every time.
+- The compiler derives Chinese pinyin initials and English word initials, preserves rests, chords, octaves and printed note lengths, and produces the same arrangement from the same code every time. Grouped notation such as `[3:.5 4:.5 5:1]{爱}` creates one lyric token and the input route `A, SPACE, SPACE`.
 - A note highway shows the next key, its literal hold length and silent rests. Tempo can be changed from 50–120 BPM without changing pitch.
 - Private imported scores can be renamed or permanently deleted from the repertoire.
 
@@ -29,7 +30,7 @@ Moonlit Records recommends a voice per arrangement while keeping all four availa
 - **Vintage Upright** — dry, characterful and nostalgic.
 - **Concert Grand** — open, resonant and hall-sized; recommended for *Ode to Joy · Excerpt*.
 
-All voices use local Salamander Grand samples with individual filtering, release, pre-delay, reverb and completion-tail profiles.
+All voices use local Salamander Grand samples. A non-looping sample naturally decays while held; keyup applies a short exponential damper release, while filtering, room reverb and completion-tail timing remain independent per voice.
 
 ## Run locally
 
