@@ -5,6 +5,11 @@ export interface PianoKeyHandle {
   id: number;
   voice: PianoVoice;
   notes: readonly string[];
+  channelHandle: PianoVoiceHandle;
+}
+
+export interface PianoVoiceHandle {
+  release(): void;
 }
 
 export interface PianoPort {
@@ -19,8 +24,8 @@ export interface PianoPort {
 }
 
 export interface PianoVoiceChannel {
-  keyDown(notes: readonly string[], normalizedVelocity: number): void;
-  keyUp(notes: readonly string[]): void;
+  keyDown(notes: readonly string[], normalizedVelocity: number): PianoVoiceHandle;
+  keyUp(handle: PianoVoiceHandle): void;
   releaseAll(): void;
   dispose(): void;
 }
@@ -47,11 +52,14 @@ export function createPianoEngine(dependencies: PianoEngineDependencies): PianoP
     },
     keyDown(notes, velocity) {
       const stableNotes = [...notes];
-      channels[activeVoice].keyDown(stableNotes, Math.min(1, Math.max(0, velocity / 127)));
-      return { id: nextHandleId++, voice: activeVoice, notes: stableNotes };
+      const channelHandle = channels[activeVoice].keyDown(
+        stableNotes,
+        Math.min(1, Math.max(0, velocity / 127)),
+      );
+      return { id: nextHandleId++, voice: activeVoice, notes: stableNotes, channelHandle };
     },
     keyUp(handle) {
-      channels[handle.voice].keyUp(handle.notes);
+      channels[handle.voice].keyUp(handle.channelHandle);
     },
     releaseAll() {
       for (const channel of Object.values(channels)) channel.releaseAll();
@@ -82,6 +90,11 @@ const SAMPLE_URLS = {
 type ToneSampler = import("tone").Sampler;
 type ToneFilter = import("tone").Filter;
 type ToneReverb = import("tone").Reverb;
+type ToneBufferSource = import("tone").ToneBufferSource;
+
+interface ToneSamplerSources {
+  _activeSources: Map<number, ToneBufferSource[]>;
+}
 
 interface LoadedVoice {
   sampler: ToneSampler;
@@ -99,10 +112,33 @@ export function createBrowserPianoEngine(): PianoPort {
       voice,
       {
         keyDown(notes: readonly string[], normalizedVelocity: number) {
-          loaded.get(voice)?.sampler.triggerAttack([...notes], undefined, normalizedVelocity);
+          const sampler = loaded.get(voice)?.sampler;
+          if (!sampler || !toneModule) return { release() {} };
+          const internals = sampler as unknown as ToneSamplerSources;
+          const before = new Map<number, Set<ToneBufferSource>>();
+          for (const note of notes) {
+            const midi = Math.round(toneModule.Frequency(note).toMidi());
+            before.set(midi, new Set(internals._activeSources.get(midi) ?? []));
+          }
+          sampler.triggerAttack([...notes], undefined, normalizedVelocity);
+          const ownedSources = notes.flatMap((note) => {
+            const midi = Math.round(toneModule!.Frequency(note).toMidi());
+            const existing = before.get(midi) ?? new Set<ToneBufferSource>();
+            return (internals._activeSources.get(midi) ?? []).filter((source) => !existing.has(source));
+          });
+          let released = false;
+          return {
+            release() {
+              if (released) return;
+              released = true;
+              for (const source of new Set(ownedSources)) {
+                if (source.state === "started") source.stop();
+              }
+            },
+          };
         },
-        keyUp(notes: readonly string[]) {
-          loaded.get(voice)?.sampler.triggerRelease([...notes]);
+        keyUp(handle: PianoVoiceHandle) {
+          handle.release();
         },
         releaseAll() {
           loaded.get(voice)?.sampler.releaseAll();

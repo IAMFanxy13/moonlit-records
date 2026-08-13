@@ -12,7 +12,12 @@ function fakePiano(): PianoPort {
     resume: vi.fn().mockResolvedValue(undefined),
     setVoice: vi.fn(),
     tailMs: vi.fn(() => 5900),
-    keyDown: vi.fn((notes) => ({ id: nextId++, voice: "warm" as const, notes: [...notes] })),
+    keyDown: vi.fn((notes) => ({
+      id: nextId++,
+      voice: "warm" as const,
+      notes: [...notes],
+      channelHandle: { release: vi.fn() },
+    })),
     keyUp: vi.fn(),
     releaseAll: vi.fn(),
     dispose: vi.fn(),
