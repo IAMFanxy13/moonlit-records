@@ -12,8 +12,8 @@ function fakePiano(): PianoPort {
     resume: vi.fn().mockResolvedValue(undefined),
     setVoice: vi.fn(),
     tailMs: vi.fn(() => 5900),
-    attack: vi.fn((notes) => ({ id: nextId++, voice: "warm" as const, notes: [...notes] })),
-    release: vi.fn(),
+    keyDown: vi.fn((notes) => ({ id: nextId++, voice: "warm" as const, notes: [...notes] })),
+    keyUp: vi.fn(),
     releaseAll: vi.fn(),
     dispose: vi.fn(),
   };
@@ -46,7 +46,7 @@ describe("PlayerShell", () => {
     expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "wrong");
     expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "target");
     expect(screen.getByText("0 / 8")).toBeInTheDocument();
-    expect(piano.attack).toHaveBeenCalledOnce();
+    expect(piano.keyDown).toHaveBeenCalledOnce();
 
     fireEvent.keyUp(window, { code: "KeyH", key: "h" });
     fireEvent.keyDown(window, { code: "KeyN", key: "n" });
@@ -55,7 +55,7 @@ describe("PlayerShell", () => {
     expect(screen.getByTestId("shared-duration-bar")).toHaveAttribute("data-countdown", "draining");
     expect(screen.getByTestId("key-KeyH")).not.toHaveAttribute("data-state", "wrong");
     expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "target");
-    expect(piano.attack).toHaveBeenCalledTimes(2);
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
 
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
     expect(screen.getByText("1 / 8")).toBeInTheDocument();
@@ -94,20 +94,20 @@ describe("PlayerShell", () => {
     fireEvent.keyDown(window, { code: "KeyN", key: "n", repeat: true });
     fireEvent.keyDown(window, { code: "KeyH", key: "h" });
 
-    expect(piano.attack).toHaveBeenCalledTimes(2);
-    expect(piano.release).not.toHaveBeenCalled();
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
+    expect(piano.keyUp).not.toHaveBeenCalled();
     expect(screen.getByText("2 / 8")).toBeInTheDocument();
     expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "pressed");
     expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "correct");
 
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
-    expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: builtinSongs[0].events[0].notes }));
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ notes: builtinSongs[0].events[0].notes }));
     expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "idle");
     expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "correct");
 
     fireEvent.keyUp(window, { code: "KeyH", key: "h" });
-    expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: builtinSongs[0].events[1].notes }));
-    expect(piano.release).toHaveBeenCalledTimes(2);
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ notes: builtinSongs[0].events[1].notes }));
+    expect(piano.keyUp).toHaveBeenCalledTimes(2);
   });
 
   it("supports pause without consuming a lyric step", () => {
@@ -173,7 +173,7 @@ describe("PlayerShell", () => {
     fireEvent.keyDown(window, { code: "KeyQ", key: "q" });
     act(() => vi.advanceTimersByTime(7000));
     expect(onComplete).not.toHaveBeenCalled();
-    expect(piano.attack).toHaveBeenCalledTimes(2);
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
 
     fireEvent.keyUp(window, { code: "KeyQ", key: "q" });
     act(() => vi.advanceTimersByTime(5900));
@@ -191,9 +191,9 @@ describe("PlayerShell", () => {
     render(<PlayerShell song={chordSong} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
 
     fireEvent.keyDown(window, { code: "KeyN", key: "n" });
-    expect(piano.attack).toHaveBeenCalledWith(["C4", "E4", "G4"], chordSong.events[0].velocity);
+    expect(piano.keyDown).toHaveBeenCalledWith(["C4", "E4", "G4"], chordSong.events[0].velocity);
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
-    expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: ["C4", "E4", "G4"] }));
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ notes: ["C4", "E4", "G4"] }));
   });
 
   it("prevents Space scrolling and keeps it silent when no continuation is expected", () => {
@@ -204,7 +204,7 @@ describe("PlayerShell", () => {
     window.dispatchEvent(space);
     fireEvent.keyDown(window, { code: "Escape", key: "Escape" });
     expect(space.defaultPrevented).toBe(true);
-    expect(piano.attack).not.toHaveBeenCalled();
+    expect(piano.keyDown).not.toHaveBeenCalled();
     expect(screen.getByText("0 / 8")).toBeInTheDocument();
   });
 
@@ -231,7 +231,7 @@ describe("PlayerShell", () => {
     fireEvent.keyUp(window, { code: "Space", key: " " });
     fireEvent.keyDown(window, { code: "Space", key: " " });
     expect(screen.getByText("3 / 3")).toBeInTheDocument();
-    expect(piano.attack).toHaveBeenCalledTimes(3);
+    expect(piano.keyDown).toHaveBeenCalledTimes(3);
   });
 
   it("releases every held audio handle on restart and blur", () => {
@@ -294,7 +294,7 @@ describe("PlayerShell", () => {
 
     fireEvent.keyDown(window, { code: "KeyN", key: "n" });
     expect(screen.getByText("0 / 1")).toBeInTheDocument();
-    expect(piano.attack).toHaveBeenCalledWith([expect.any(String)], 78);
+    expect(piano.keyDown).toHaveBeenCalledWith([expect.any(String)], 78);
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
 
     act(() => vi.advanceTimersByTime(1_000));

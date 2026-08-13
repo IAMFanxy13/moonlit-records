@@ -19,4 +19,13 @@ describe("piano voice profiles", () => {
     expect(concert.tailMs).toBeGreaterThan(felt.tailMs);
     expect(felt.tailMs).toBeGreaterThan(studio.tailMs);
   });
+
+  it("uses a short damper fade while keeping the room tail independent", () => {
+    for (const voice of PIANO_VOICE_ORDER) {
+      const profile = getPianoVoiceProfile(voice);
+      expect(profile.damperRelease).toBeGreaterThanOrEqual(0.18);
+      expect(profile.damperRelease).toBeLessThanOrEqual(0.5);
+      expect(profile.tailMs).toBeGreaterThan(profile.damperRelease * 1000);
+    }
+  });
 });

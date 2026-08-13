@@ -17,8 +17,8 @@ describe("MoonlitPiano", () => {
       resume: vi.fn().mockResolvedValue(undefined),
       setVoice: vi.fn(),
       tailMs: vi.fn(() => 5900),
-      attack: vi.fn((notes: readonly string[]) => ({ id: handleId++, voice: "warm" as const, notes: [...notes] })),
-      release: vi.fn(),
+      keyDown: vi.fn((notes: readonly string[]) => ({ id: handleId++, voice: "warm" as const, notes: [...notes] })),
+      keyUp: vi.fn(),
       releaseAll: vi.fn(),
       dispose: vi.fn(),
     };

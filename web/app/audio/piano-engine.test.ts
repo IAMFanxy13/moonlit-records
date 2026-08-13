@@ -6,8 +6,8 @@ import type { PianoVoice } from "../lib/song";
 
 function channel(): PianoVoiceChannel {
   return {
-    attack: vi.fn(),
-    release: vi.fn(),
+    keyDown: vi.fn(),
+    keyUp: vi.fn(),
     releaseAll: vi.fn(),
     dispose: vi.fn(),
   };
@@ -23,7 +23,7 @@ function channels(): Record<PianoVoice, PianoVoiceChannel> {
 }
 
 describe("piano engine", () => {
-  it("attacks a complete voicing through the globally selected voice", async () => {
+  it("starts one complete voicing through the globally selected voice", async () => {
     const voiceChannels = channels();
     const load = vi.fn().mockResolvedValue(undefined);
     const resume = vi.fn().mockResolvedValue(undefined);
@@ -31,36 +31,36 @@ describe("piano engine", () => {
 
     await piano.load();
     await piano.resume();
-    const warmHandle = piano.attack(["C4", "E4", "G4"], 112);
+    const warmHandle = piano.keyDown(["C4", "E4", "G4"], 112);
     piano.setVoice("concert");
-    const concertHandle = piano.attack(["D4"], 88);
+    const concertHandle = piano.keyDown(["D4"], 88);
 
     expect(warmHandle).toMatchObject({ voice: "warm", notes: ["C4", "E4", "G4"] });
     expect(concertHandle).toMatchObject({ voice: "concert", notes: ["D4"] });
-    expect(voiceChannels.warm.attack).toHaveBeenCalledWith(["C4", "E4", "G4"], 112 / 127);
-    expect(voiceChannels.concert.attack).toHaveBeenCalledWith(["D4"], 88 / 127);
+    expect(voiceChannels.warm.keyDown).toHaveBeenCalledWith(["C4", "E4", "G4"], 112 / 127);
+    expect(voiceChannels.concert.keyDown).toHaveBeenCalledWith(["D4"], 88 / 127);
   });
 
-  it("releases an old attack through the voice that originally made it", () => {
+  it("releases a key through the voice that originally made it", () => {
     const voiceChannels = channels();
     const piano = createPianoEngine({ channels: voiceChannels, load: async () => undefined, resume: async () => undefined });
 
-    const handle = piano.attack(["C4", "E4", "G4"], 96);
+    const handle = piano.keyDown(["C4", "E4", "G4"], 96);
     piano.setVoice("concert");
-    piano.release(handle);
+    piano.keyUp(handle);
 
-    expect(voiceChannels.warm.release).toHaveBeenCalledWith(["C4", "E4", "G4"]);
-    expect(voiceChannels.concert.release).not.toHaveBeenCalled();
+    expect(voiceChannels.warm.keyUp).toHaveBeenCalledWith(["C4", "E4", "G4"]);
+    expect(voiceChannels.concert.keyUp).not.toHaveBeenCalled();
   });
 
   it("uses the selected voice tail and clamps velocity", () => {
     const voiceChannels = channels();
     const piano = createPianoEngine({ channels: voiceChannels, load: async () => undefined, resume: async () => undefined });
 
-    piano.attack(["C4"], 300);
-    piano.attack(["D4"], -20);
-    expect(voiceChannels.warm.attack).toHaveBeenNthCalledWith(1, ["C4"], 1);
-    expect(voiceChannels.warm.attack).toHaveBeenNthCalledWith(2, ["D4"], 0);
+    piano.keyDown(["C4"], 300);
+    piano.keyDown(["D4"], -20);
+    expect(voiceChannels.warm.keyDown).toHaveBeenNthCalledWith(1, ["C4"], 1);
+    expect(voiceChannels.warm.keyDown).toHaveBeenNthCalledWith(2, ["D4"], 0);
 
     piano.setVoice("upright");
     expect(piano.tailMs()).toBe(getPianoVoiceProfile("upright").tailMs);

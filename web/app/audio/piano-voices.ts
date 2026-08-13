@@ -4,7 +4,8 @@ export interface PianoVoiceProfile {
   name: string;
   description: string;
   cutoff: number;
-  samplerRelease: number;
+  /** Short physical-damper fade after keyup; the room tail is modelled separately. */
+  damperRelease: number;
   reverbDecay: number;
   preDelay: number;
   wet: number;
@@ -18,7 +19,7 @@ const PIANO_VOICE_PROFILES: Record<PianoVoice, PianoVoiceProfile> = {
     name: "Felt Grand",
     description: "Intimate, softened and lyrical",
     cutoff: 3600,
-    samplerRelease: 0.95,
+    damperRelease: 0.42,
     reverbDecay: 4.8,
     preDelay: 0.018,
     wet: 0.26,
@@ -28,7 +29,7 @@ const PIANO_VOICE_PROFILES: Record<PianoVoice, PianoVoiceProfile> = {
     name: "Studio Grand",
     description: "Clear, articulate and close",
     cutoff: 6200,
-    samplerRelease: 0.72,
+    damperRelease: 0.28,
     reverbDecay: 3.5,
     preDelay: 0.014,
     wet: 0.2,
@@ -38,7 +39,7 @@ const PIANO_VOICE_PROFILES: Record<PianoVoice, PianoVoiceProfile> = {
     name: "Vintage Upright",
     description: "Dry, characterful and nostalgic",
     cutoff: 4200,
-    samplerRelease: 0.62,
+    damperRelease: 0.22,
     reverbDecay: 2.7,
     preDelay: 0.012,
     wet: 0.16,
@@ -48,7 +49,7 @@ const PIANO_VOICE_PROFILES: Record<PianoVoice, PianoVoiceProfile> = {
     name: "Concert Grand",
     description: "Open, resonant and hall-sized",
     cutoff: 5600,
-    samplerRelease: 1,
+    damperRelease: 0.48,
     reverbDecay: 6,
     preDelay: 0.028,
     wet: 0.32,

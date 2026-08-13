@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { PianoAttackHandle, PianoPort } from "../audio/piano-engine";
+import type { PianoKeyHandle, PianoPort } from "../audio/piano-engine";
 import { getPianoVoiceProfile, PIANO_VOICE_ORDER } from "../audio/piano-voices";
 import { defaultNoteFor, isPerformanceInputCode, isPlayableCode, labelForCode } from "../lib/keyboard";
 import {
@@ -46,7 +46,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   const [restRemainingMs, setRestRemainingMs] = useState(
     () => performanceSong.events[0]?.restBeforeMs ?? 0,
   );
-  const attackedHandles = useRef(new Map<string, PianoAttackHandle>());
+  const attackedHandles = useRef(new Map<string, PianoKeyHandle>());
   const completedRests = useRef(new Set<string>());
   const completedOnce = useRef(false);
   const completionTimer = useRef<number | null>(null);
@@ -145,7 +145,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
       setPlayerState((current) => {
         if (isResting) {
           if (isPlayableCode(event.code)) {
-            const handle = piano.attack([defaultNoteFor(event.code)], 78);
+            const handle = piano.keyDown([defaultNoteFor(event.code)], 78);
             attackedHandles.current.set(event.code, handle);
             setFeedback({ code: event.code, kind: "free" });
           }
@@ -153,7 +153,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
         }
         const result = pressKey(current, performanceSong, event.code, event.timeStamp);
         if (result.sound) {
-          const handle = piano.attack(result.sound.notes, result.sound.velocity);
+          const handle = piano.keyDown(result.sound.notes, result.sound.velocity);
           attackedHandles.current.set(event.code, handle);
           setFeedback({ code: event.code, kind: result.sound.kind });
         }
@@ -164,7 +164,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     const handleKeyUp = (event: KeyboardEvent) => {
       const handle = attackedHandles.current.get(event.code);
       if (handle) {
-        piano.release(handle);
+        piano.keyUp(handle);
         attackedHandles.current.delete(event.code);
       }
       setPlayerState((current) => {

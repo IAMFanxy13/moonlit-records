@@ -1,7 +1,7 @@
 import type { PianoVoice } from "../lib/song";
 import { getPianoVoiceProfile, PIANO_VOICE_ORDER } from "./piano-voices";
 
-export interface PianoAttackHandle {
+export interface PianoKeyHandle {
   id: number;
   voice: PianoVoice;
   notes: readonly string[];
@@ -12,15 +12,15 @@ export interface PianoPort {
   resume(): Promise<void>;
   setVoice(voice: PianoVoice): void;
   tailMs(): number;
-  attack(notes: readonly string[], velocity: number): PianoAttackHandle;
-  release(handle: PianoAttackHandle): void;
+  keyDown(notes: readonly string[], velocity: number): PianoKeyHandle;
+  keyUp(handle: PianoKeyHandle): void;
   releaseAll(): void;
   dispose(): void;
 }
 
 export interface PianoVoiceChannel {
-  attack(notes: readonly string[], normalizedVelocity: number): void;
-  release(notes: readonly string[]): void;
+  keyDown(notes: readonly string[], normalizedVelocity: number): void;
+  keyUp(notes: readonly string[]): void;
   releaseAll(): void;
   dispose(): void;
 }
@@ -45,13 +45,13 @@ export function createPianoEngine(dependencies: PianoEngineDependencies): PianoP
     tailMs() {
       return getPianoVoiceProfile(activeVoice).tailMs;
     },
-    attack(notes, velocity) {
+    keyDown(notes, velocity) {
       const stableNotes = [...notes];
-      channels[activeVoice].attack(stableNotes, Math.min(1, Math.max(0, velocity / 127)));
+      channels[activeVoice].keyDown(stableNotes, Math.min(1, Math.max(0, velocity / 127)));
       return { id: nextHandleId++, voice: activeVoice, notes: stableNotes };
     },
-    release(handle) {
-      channels[handle.voice].release(handle.notes);
+    keyUp(handle) {
+      channels[handle.voice].keyUp(handle.notes);
     },
     releaseAll() {
       for (const channel of Object.values(channels)) channel.releaseAll();
@@ -98,10 +98,10 @@ export function createBrowserPianoEngine(): PianoPort {
     PIANO_VOICE_ORDER.map((voice) => [
       voice,
       {
-        attack(notes: readonly string[], normalizedVelocity: number) {
+        keyDown(notes: readonly string[], normalizedVelocity: number) {
           loaded.get(voice)?.sampler.triggerAttack([...notes], undefined, normalizedVelocity);
         },
-        release(notes: readonly string[]) {
+        keyUp(notes: readonly string[]) {
           loaded.get(voice)?.sampler.triggerRelease([...notes]);
         },
         releaseAll() {
@@ -139,7 +139,8 @@ export function createBrowserPianoEngine(): PianoPort {
           urls: SAMPLE_URLS,
           baseUrl: "/audio/salamander/",
           attack: 0.004,
-          release: profile.samplerRelease,
+          release: profile.damperRelease,
+          curve: "exponential",
         }).connect(filter);
         loaded.set(voice, { sampler, filter, reverb });
       }
