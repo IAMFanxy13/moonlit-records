@@ -7,6 +7,12 @@ export interface SongEvent {
   phraseIndex: number;
   tokenIndex: number | null;
   token: string | null;
+  /** Stable display-token ownership. Added after V1; absent in older saved packages. */
+  lyricTokenId?: string | null;
+  /** Zero-based note position inside one displayed lyric token. */
+  lyricSubIndex?: number | null;
+  /** Total score events owned by one displayed lyric token. */
+  lyricSubCount?: number | null;
   targetCode: string;
   notes: string[];
   /** @deprecated Read `notes`; retained while calibrated V1 packages migrate. */
@@ -20,6 +26,15 @@ export interface SongEvent {
   sourceEndMs?: number;
   confidence: number;
   provenance: string[];
+}
+
+export interface LyricToken {
+  id: string;
+  phraseIndex: number;
+  tokenIndex: number;
+  text: string;
+  startEvent: number;
+  endEvent: number;
 }
 
 export interface Phrase {
@@ -43,6 +58,8 @@ export interface SongPackage {
   quality: ArrangementQuality;
   provenance: string[];
   phrases: Phrase[];
+  /** Optional for persistence compatibility; playback normalizes older packages. */
+  lyricTokens?: LyricToken[];
   events: SongEvent[];
 }
 
