@@ -10,6 +10,8 @@ An English-first, lyric-guided concert piano that turns a standard computer keyb
 - See KTV-style current and next lyric lines, with the required key illuminated on a full screen keyboard.
 - Hear wrong keys as ordinary free-play notes. They mark red but do not advance the lyric; the expected key continues waiting.
 - A correct physical keydown sounds the note and opens the next score event immediately. Keyup only releases that physical key, so independent held keys can overlap for legato or form real chords.
+- Correct melody notes use bounded phrase-aware damper resonance: releasing a key can leave a short connected tail, while repeated pitches, printed rests and phrase boundaries clear stale resonance before the next attack.
+- Resonance never creates an attack by itself, keeps at most four released gestures for at most 2.4 seconds, and is cleared on pause, restart, replay, exit or focus loss.
 - The duration rail is guidance only: it begins draining when the key is pressed, but early release and over-holding are both allowed and never scored.
 - Continue improvising after the final lyric note. Completion waits until every held key is released and the selected hall tail has fully faded.
 
@@ -30,7 +32,7 @@ Moonlit Records recommends a voice per arrangement while keeping all four availa
 - **Vintage Upright** — dry, characterful and nostalgic.
 - **Concert Grand** — open, resonant and hall-sized; recommended for *Ode to Joy · Excerpt*.
 
-All voices use local Salamander Grand samples. A non-looping sample naturally decays while held; keyup applies a short exponential damper release, while filtering, room reverb and completion-tail timing remain independent per voice.
+All voices use local Salamander Grand samples. The sample playback, short per-source damper release, bounded phrase resonance and room reverb are separate stages; completion-tail timing remains independent per voice.
 
 ## Run locally
 

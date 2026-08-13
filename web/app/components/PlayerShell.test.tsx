@@ -84,7 +84,78 @@ describe("PlayerShell", () => {
     expect(durationBar.compareDocumentPosition(keyboard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("attacks H while N is still held without waiting for keyup", () => {
+  it("Case A: N then H advances two ordinary lyric events", () => {
+    const piano = fakePiano();
+    render(
+      <PlayerShell
+        song={builtinSongs[0]}
+        piano={piano}
+        onExit={vi.fn()}
+        onComplete={vi.fn()}
+      />,
+    );
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+
+    expect(screen.getByText("2 / 8")).toBeInTheDocument();
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
+    expect(piano.keyUp).not.toHaveBeenCalled();
+  });
+
+  it("Case C: fresh A presses handle three genuinely repeated lyric tokens", () => {
+    const piano = fakePiano();
+    const source = builtinSongs[0];
+    const repeatedTokens = {
+      ...source,
+      phrases: [{ id: "three-loves", text: "爱爱爱", startEvent: 0, endEvent: 2 }],
+      events: ["C4", "D4", "E4"].map((note, index) => ({
+        ...source.events[index],
+        id: `love-${index}`,
+        phraseIndex: 0,
+        tokenIndex: index,
+        token: "爱",
+        targetCode: "KeyA",
+        notes: [note],
+        note,
+      })),
+    };
+    const { container } = render(
+      <PlayerShell song={repeatedTokens} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />,
+    );
+
+    fireEvent.keyDown(window, { code: "KeyA", key: "a" });
+    expect(piano.keyDown).toHaveBeenCalledOnce();
+    fireEvent.keyUp(window, { code: "KeyA", key: "a" });
+    fireEvent.keyDown(window, { code: "KeyA", key: "a" });
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
+    fireEvent.keyUp(window, { code: "KeyA", key: "a" });
+    fireEvent.keyDown(window, { code: "KeyA", key: "a" });
+
+    expect(container.querySelectorAll(".lyric-token")).toHaveLength(3);
+    expect(screen.getByText("3 / 3")).toBeInTheDocument();
+    expect(piano.keyDown).toHaveBeenCalledTimes(3);
+    expect(piano.keyUp).not.toHaveBeenCalled();
+  });
+
+  it("Case D: wrong J sounds, does not advance, and releases immediately", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyJ", key: "j" });
+    expect(screen.getByText("0 / 8")).toBeInTheDocument();
+    expect(piano.keyDown).toHaveBeenCalledOnce();
+    expect(piano.keyUp).not.toHaveBeenCalled();
+
+    fireEvent.keyUp(window, { code: "KeyJ", key: "j" });
+    expect(screen.getByText("0 / 8")).toBeInTheDocument();
+    expect(piano.keyDown).toHaveBeenCalledOnce();
+    expect(piano.keyUp).toHaveBeenCalledOnce();
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+  });
+
+  it("Case E: attacks H while N remains physically held and keeps both handles independent", () => {
     const piano = fakePiano();
     render(
       <PlayerShell
@@ -238,7 +309,7 @@ describe("PlayerShell", () => {
     expect(piano.keyUp).toHaveBeenCalledTimes(2);
   });
 
-  it("holds one non-looping sample without repeat attacks and bounds its released resonance", () => {
+  it("Case F: a five-second N hold attacks once and starts resonance only on keyup", () => {
     const piano = fakePiano();
     render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
 
@@ -358,7 +429,7 @@ describe("PlayerShell", () => {
     expect(screen.getByText("0 / 8")).toBeInTheDocument();
   });
 
-  it("plays one lyric initial followed by fresh Space continuation attacks", () => {
+  it("Case B: A then two fresh Space presses play three notes for one lyric token", () => {
     const piano = fakePiano();
     const source = builtinSongs[0];
     const melisma = {
@@ -370,7 +441,9 @@ describe("PlayerShell", () => {
         { ...source.events[0], id: "a-2", phraseIndex: 0, token: "爱", targetCode: "KeyA" },
       ],
     };
-    render(<PlayerShell song={melisma} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+    const { container } = render(
+      <PlayerShell song={melisma} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />,
+    );
 
     fireEvent.keyDown(window, { code: "KeyA", key: "a" });
     expect(screen.getByText("1 / 3")).toBeInTheDocument();
@@ -381,7 +454,46 @@ describe("PlayerShell", () => {
     fireEvent.keyUp(window, { code: "Space", key: " " });
     fireEvent.keyDown(window, { code: "Space", key: " " });
     expect(screen.getByText("3 / 3")).toBeInTheDocument();
+    expect(container.querySelectorAll(".lyric-token")).toHaveLength(1);
     expect(piano.keyDown).toHaveBeenCalledTimes(3);
+    expect(piano.keyUp).toHaveBeenCalledOnce();
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }));
+  });
+
+  it("does not release H when N keyup follows H attack", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+    fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
+    expect(piano.keyUp).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(2_400));
+    expect(piano.keyUp).toHaveBeenCalledOnce();
+    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    expect(piano.keyUp).not.toHaveBeenCalledWith(expect.objectContaining({ id: 2 }));
+  });
+
+  it("restart clears a mixed held and deferred set once without timer-driven release", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
+    expect(piano.keyUp).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Restart" }));
+    expect(piano.releaseAll).toHaveBeenCalledOnce();
+    expect(piano.keyUp).not.toHaveBeenCalled();
+    expect(screen.getByText("0 / 8")).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(2_401));
+    expect(piano.releaseAll).toHaveBeenCalledOnce();
+    expect(piano.keyUp).not.toHaveBeenCalled();
   });
 
   it("releases every held audio handle on restart and blur", () => {
