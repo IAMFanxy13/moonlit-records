@@ -22,7 +22,7 @@ function tokenState(token: LyricToken, eventIndex: number): "done" | "current" |
 }
 
 export function LyricStage({ song, eventIndex }: LyricStageProps) {
-  const displaySong = normalizeSongPackage(song);
+  const displaySong = song.lyricTokens ? song : normalizeSongPackage(song);
   const safeEventIndex = Math.min(eventIndex, Math.max(displaySong.events.length - 1, 0));
   const currentPhraseIndex = displaySong.events[safeEventIndex]?.phraseIndex ?? displaySong.phrases.length - 1;
   const currentPhrase = displaySong.phrases[currentPhraseIndex];
