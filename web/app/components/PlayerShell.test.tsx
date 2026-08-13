@@ -51,9 +51,10 @@ describe("PlayerShell", () => {
     fireEvent.keyUp(window, { code: "KeyH", key: "h" });
     fireEvent.keyDown(window, { code: "KeyN", key: "n" });
 
-    expect(screen.getByText("0 / 8")).toBeInTheDocument();
+    expect(screen.getByText("1 / 8")).toBeInTheDocument();
     expect(screen.getByTestId("shared-duration-bar")).toHaveAttribute("data-countdown", "draining");
     expect(screen.getByTestId("key-KeyH")).not.toHaveAttribute("data-state", "wrong");
+    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "target");
     expect(piano.attack).toHaveBeenCalledTimes(2);
 
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
@@ -78,7 +79,7 @@ describe("PlayerShell", () => {
     expect(durationBar.compareDocumentPosition(keyboard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("holds each attacked note until its own keyup and supports chords", () => {
+  it("attacks H while N is still held and each keyup releases only its own audio handle", () => {
     const piano = fakePiano();
     render(
       <PlayerShell
@@ -95,17 +96,18 @@ describe("PlayerShell", () => {
 
     expect(piano.attack).toHaveBeenCalledTimes(2);
     expect(piano.release).not.toHaveBeenCalled();
-    expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "target");
-    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "wrong");
+    expect(screen.getByText("2 / 8")).toBeInTheDocument();
+    expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "pressed");
+    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "correct");
 
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
-    expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: ["G4"] }));
+    expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: builtinSongs[0].events[0].notes }));
     expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "idle");
-    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "target");
+    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "correct");
 
     fireEvent.keyUp(window, { code: "KeyH", key: "h" });
-    expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: ["C#5"] }));
-    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "target");
+    expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: builtinSongs[0].events[1].notes }));
+    expect(piano.release).toHaveBeenCalledTimes(2);
   });
 
   it("supports pause without consuming a lyric step", () => {
@@ -138,7 +140,7 @@ describe("PlayerShell", () => {
     );
 
     fireEvent.keyDown(window, { code: "KeyN", key: "n" });
-    expect(screen.getByText("0 / 1")).toBeInTheDocument();
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
 
     act(() => vi.advanceTimersByTime(12000));
     expect(onComplete).not.toHaveBeenCalled();
@@ -194,17 +196,62 @@ describe("PlayerShell", () => {
     expect(piano.release).toHaveBeenCalledWith(expect.objectContaining({ notes: ["C4", "E4", "G4"] }));
   });
 
-  it("ignores Space and every non-performance key", () => {
+  it("prevents Space scrolling and keeps it silent when no continuation is expected", () => {
     const piano = fakePiano();
     render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
 
-    fireEvent.keyDown(window, { code: "Space", key: " " });
+    const space = new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true, cancelable: true });
+    window.dispatchEvent(space);
     fireEvent.keyDown(window, { code: "Escape", key: "Escape" });
+    expect(space.defaultPrevented).toBe(true);
     expect(piano.attack).not.toHaveBeenCalled();
     expect(screen.getByText("0 / 8")).toBeInTheDocument();
   });
 
-  it("uses the duration rail as guidance and advances on any matching release", () => {
+  it("plays one lyric initial followed by fresh Space continuation attacks", () => {
+    const piano = fakePiano();
+    const source = builtinSongs[0];
+    const melisma = {
+      ...source,
+      phrases: [{ id: "melisma", text: "爱", startEvent: 0, endEvent: 2 }],
+      events: [
+        { ...source.events[0], id: "a-0", phraseIndex: 0, token: "爱", targetCode: "KeyA" },
+        { ...source.events[0], id: "a-1", phraseIndex: 0, token: "爱", targetCode: "KeyA" },
+        { ...source.events[0], id: "a-2", phraseIndex: 0, token: "爱", targetCode: "KeyA" },
+      ],
+    };
+    render(<PlayerShell song={melisma} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyA", key: "a" });
+    expect(screen.getByText("1 / 3")).toBeInTheDocument();
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    expect(screen.getByText("2 / 3")).toBeInTheDocument();
+    fireEvent.keyDown(window, { code: "Space", key: " ", repeat: true });
+    expect(screen.getByText("2 / 3")).toBeInTheDocument();
+    fireEvent.keyUp(window, { code: "Space", key: " " });
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+    expect(screen.getByText("3 / 3")).toBeInTheDocument();
+    expect(piano.attack).toHaveBeenCalledTimes(3);
+  });
+
+  it("releases every held audio handle on restart and blur", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+    fireEvent.click(screen.getByRole("button", { name: "Restart" }));
+    expect(piano.releaseAll).toHaveBeenCalledOnce();
+    expect(screen.getByText("0 / 8")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
+    fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+    fireEvent.blur(window);
+    expect(piano.releaseAll).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Paused — the keyboard remains open for free play.")).toBeInTheDocument();
+  });
+
+  it("keeps the duration rail as guidance after keydown cursor advancement", () => {
     const piano = fakePiano();
     const base = builtinSongs[0];
     const holdSong = {
@@ -217,6 +264,7 @@ describe("PlayerShell", () => {
     expect(screen.queryByLabelText("Hold this key")).not.toBeInTheDocument();
     fireEvent.keyDown(window, { code: "KeyN", key: "n", timeStamp: 100 });
     expect(screen.getByTestId("shared-duration-bar")).toHaveAttribute("data-countdown", "draining");
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
     fireEvent.keyUp(window, { code: "KeyN", key: "n", timeStamp: 200 });
     expect(screen.getByText("1 / 1")).toBeInTheDocument();
     expect(screen.queryByText(/Release was early/)).not.toBeInTheDocument();

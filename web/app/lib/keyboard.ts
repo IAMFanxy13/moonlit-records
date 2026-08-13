@@ -16,6 +16,7 @@ export const KEYBOARD_ROWS: KeyboardKey[][] = [
 ];
 
 export const PERFORMANCE_CODES = KEYBOARD_ROWS.flat().map((item) => item.code);
+export const LYRIC_CONTINUATION_CODE = "Space";
 
 // Kept as a compatibility alias for older catalogue code.
 export const PLAYABLE_CODES = PERFORMANCE_CODES;
@@ -36,6 +37,10 @@ export function isPlayableCode(code: string): boolean {
   return DEFAULT_NOTES.has(code);
 }
 
+export function isPerformanceInputCode(code: string): boolean {
+  return code === LYRIC_CONTINUATION_CODE || isPlayableCode(code);
+}
+
 export function defaultNoteFor(code: string): string {
   const note = DEFAULT_NOTES.get(code);
   if (!note) throw new Error(`Unsupported piano key: ${code}`);
@@ -43,5 +48,6 @@ export function defaultNoteFor(code: string): string {
 }
 
 export function labelForCode(code: string): string {
+  if (code === LYRIC_CONTINUATION_CODE) return "SPACE";
   return KEYBOARD_ROWS.flat().find((item) => item.code === code)?.label ?? code;
 }

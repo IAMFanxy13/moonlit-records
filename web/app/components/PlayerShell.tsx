@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { PianoAttackHandle, PianoPort } from "../audio/piano-engine";
 import { getPianoVoiceProfile, PIANO_VOICE_ORDER } from "../audio/piano-voices";
-import { defaultNoteFor, isPlayableCode, labelForCode } from "../lib/keyboard";
+import { defaultNoteFor, isPerformanceInputCode, isPlayableCode, labelForCode } from "../lib/keyboard";
 import {
   createPlayerState,
   finishRinging,
@@ -17,6 +17,7 @@ import {
   type PlayerState,
 } from "../lib/player-machine";
 import type { PianoVoice, SongPackage } from "../lib/song";
+import { normalizeSongPackage } from "../lib/song-normalizer";
 import { scaleSongTempo } from "../lib/tempo";
 import { LyricStage } from "./LyricStage";
 import { RhythmGuide, SharedDurationBar } from "./RhythmGuide";
@@ -36,8 +37,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProps) {
   const [tempo, setTempo] = useState(song.tempoBpm ?? 72);
-  const performanceSong = useMemo(() => scaleSongTempo(song, tempo), [song, tempo]);
-  const [playerState, setPlayerState] = useState(() => startPlayer(createPlayerState(song)));
+  const normalizedSong = useMemo(() => normalizeSongPackage(song), [song]);
+  const performanceSong = useMemo(() => scaleSongTempo(normalizedSong, tempo), [normalizedSong, tempo]);
+  const [playerState, setPlayerState] = useState(() => startPlayer(createPlayerState(normalizedSong)));
   const [feedback, setFeedback] = useState<KeyFeedback | null>(null);
   const [pressedCodes, setPressedCodes] = useState<Set<string>>(() => new Set());
   const [voice, setVoice] = useState<PianoVoice>(song.recommendedPiano);
@@ -50,6 +52,12 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   const completionTimer = useRef<number | null>(null);
 
   const currentEvent = performanceSong.events[playerState.eventIndex];
+  const latestActiveHold = Object.values(playerState.activeHolds)
+    .sort((left, right) => right.startedAt - left.startedAt)[0];
+  const heldGuideEvent = latestActiveHold
+    ? performanceSong.events[latestActiveHold.eventIndex]
+    : undefined;
+  const durationGuideEvent = heldGuideEvent ?? currentEvent;
   const progress = Math.round((playerState.eventIndex / performanceSong.events.length) * 100);
   const isResting = restRemainingMs > 0;
 
@@ -124,20 +132,23 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Space") event.preventDefault();
       if (
         event.repeat ||
         attackedHandles.current.has(event.code) ||
         isTypingTarget(event.target) ||
-        !isPlayableCode(event.code)
+        !isPerformanceInputCode(event.code)
       ) return;
       event.preventDefault();
       setPressedCodes((current) => new Set(current).add(event.code));
 
       setPlayerState((current) => {
         if (isResting) {
-          const handle = piano.attack([defaultNoteFor(event.code)], 78);
-          attackedHandles.current.set(event.code, handle);
-          setFeedback({ code: event.code, kind: "free" });
+          if (isPlayableCode(event.code)) {
+            const handle = piano.attack([defaultNoteFor(event.code)], 78);
+            attackedHandles.current.set(event.code, handle);
+            setFeedback({ code: event.code, kind: "free" });
+          }
           return current;
         }
         const result = pressKey(current, performanceSong, event.code, event.timeStamp);
@@ -170,7 +181,9 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
     const pauseForInterruption = () => {
       releaseEverything();
-      setPlayerState((current) => current.status === "playing" ? togglePause(current) : current);
+      setPlayerState((current) => current.status === "playing"
+        ? togglePause(current)
+        : { ...current, activeHolds: {} });
     };
 
     const handleVisibility = () => {
@@ -288,12 +301,12 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
         <strong>{playerState.eventIndex} / {performanceSong.events.length}</strong>
       </div>
 
-      {currentEvent && !["ringing", "complete"].includes(playerState.status) && (
+      {durationGuideEvent && playerState.status !== "complete" && (
         <SharedDurationBar
-          key={currentEvent.id}
-          event={currentEvent}
-          active={playerState.activeHold?.code === currentEvent.targetCode}
-          resting={isResting}
+          key={`${durationGuideEvent.id}-${latestActiveHold?.startedAt ?? "preview"}`}
+          event={durationGuideEvent}
+          active={Boolean(latestActiveHold)}
+          resting={isResting && !heldGuideEvent}
         />
       )}
 
@@ -311,6 +324,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
 
       <footer className="player-footer">
         <button type="button" onClick={() => {
+          releaseEverything();
           completedRests.current.clear();
           setPlayerState((current) => rewindPhrase(current, performanceSong));
         }}>↶ Replay this line</button>
