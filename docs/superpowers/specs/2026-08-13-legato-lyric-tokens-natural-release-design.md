@@ -4,6 +4,8 @@
 
 Make Moonlit Records feel closer to a real piano without changing its simple input model. Letters remain lyric/free-play keys, digits remain instrumental/free-play keys, and Space becomes the continuation key for additional notes sung on one lyric token. No pedal, Shift modifier, MIDI input, scoring system, OCR, or unrelated interface redesign is included.
 
+The physical computer keyboard is the instrument: sound exists only because the performer presses a key. The webpage is a visual lyric, note, and duration guide; it never auto-plays the score or blocks expression to enforce timing.
+
 ## Confirmed Interaction Contract
 
 - A correct physical `keydown` attacks exactly one score event and immediately advances the score cursor.

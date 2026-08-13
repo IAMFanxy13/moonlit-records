@@ -14,6 +14,42 @@ line: 静止
 notes: 1:1{静} 0:.5 ^1+3+5:2{止}`;
 
 describe("compileMoonlitScoreCode", () => {
+  it("compiles one grouped lyric token into its initial followed by Space continuations", () => {
+    const record = compileMoonlitScoreCode(`MOONLIT-SCORE/1
+title: Melisma
+artist: Moonlit
+key: C
+meter: 4/4
+tempo: 72
+voice: felt
+
+line: 爱
+notes: [3:.5 4:.5 5:1]{爱}`);
+
+    expect(record.song.lyricTokens).toEqual([expect.objectContaining({
+      text: "爱",
+      startEvent: 0,
+      endEvent: 2,
+    })]);
+    expect(record.song.events.map((event) => event.targetCode)).toEqual(["KeyA", "Space", "Space"]);
+    expect(record.song.events.map((event) => event.notes[0])).toEqual(["E4", "F4", "G4"]);
+  });
+
+  it("keeps the old repeated-note syntax compatible while normalizing its lyric ownership", () => {
+    const record = compileMoonlitScoreCode(`MOONLIT-SCORE/1
+title: Legacy Melisma
+artist: Moonlit
+key: C
+meter: 4/4
+tempo: 72
+voice: felt
+
+line: 爱
+notes: 3:.5{爱} 4:.5{爱} 5:1{爱}`);
+
+    expect(record.song.events.map((event) => event.targetCode)).toEqual(["KeyA", "Space", "Space"]);
+  });
+
   it("compiles Chinese initials, rests, octave marks, and one-key chords", () => {
     const record = compileMoonlitScoreCode(chineseCode, {
       now: "2026-08-12T12:00:00.000Z",

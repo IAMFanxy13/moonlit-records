@@ -1,6 +1,7 @@
 import { pinyin } from "pinyin-pro";
 
 import type { PianoVoice, SongEvent, SongPackage } from "../lib/song";
+import { normalizeSongPackage } from "../lib/song-normalizer";
 import type { PrivateSongRecord } from "./types";
 
 const MAX_CODE_LENGTH = 300_000;
@@ -22,6 +23,7 @@ const VOICES: Record<string, PianoVoice> = {
 const REQUIRED_HEADERS = ["title", "artist", "key", "meter", "tempo", "voice"] as const;
 const HEADER_NAMES = new Set<string>(REQUIRED_HEADERS);
 const NOTE_AT = /\s*(0|(?:[\^,]?[1-7])(?:\+(?:[\^,]?[1-7]))*):(\d+(?:\.\d*)?|\.\d+)(?:\{([^{}\r\n]+)\})?/y;
+const BARE_NOTE_AT = /\s*(0|(?:[\^,]?[1-7])(?:\+(?:[\^,]?[1-7]))*):(\d+(?:\.\d*)?|\.\d+)/y;
 const CHINESE_TOKEN = /^\p{Script=Han}$/u;
 const ENGLISH_TOKEN = /^[A-Za-z]+(?:'[A-Za-z]+)?$/u;
 
@@ -94,17 +96,9 @@ function lyricInitial(token: string): string {
   return token[0].toUpperCase();
 }
 
-function parseNotes(value: string, line: number): CodeNote[] {
-  const notes: CodeNote[] = [];
-  let cursor = 0;
-  while (cursor < value.length) {
-    NOTE_AT.lastIndex = cursor;
-    const match = NOTE_AT.exec(value);
-    if (!match) throw new MoonlitScoreCodeError("Invalid note. Use pitch:beats{lyric}, for example 3:1{海}.", line);
-    cursor = NOTE_AT.lastIndex;
-    const pitches = match[1] === "0" ? [] : match[1].split("+");
-    const beats = Number(match[2]);
-    const lyric = match[3]?.trim() || null;
+function codeNote(pitchText: string, beatText: string, lyric: string | null, line: number): CodeNote {
+    const pitches = pitchText === "0" ? [] : pitchText.split("+");
+    const beats = Number(beatText);
     if (!Number.isFinite(beats) || beats <= 0 || beats > 16) {
       throw new MoonlitScoreCodeError("Beat length must be greater than 0 and no more than 16.", line);
     }
@@ -114,7 +108,53 @@ function parseNotes(value: string, line: number): CodeNote[] {
     if (lyric && !CHINESE_TOKEN.test(lyric) && !ENGLISH_TOKEN.test(lyric)) {
       throw new MoonlitScoreCodeError("Lyrics must be one Chinese character or one English word per note.", line);
     }
-    notes.push({ pitches, beats, lyric, line });
+    return { pitches, beats, lyric, line };
+}
+
+function parseGroupedNotes(value: string, line: number): CodeNote[] {
+  const close = value.indexOf("]");
+  if (close < 0) throw new MoonlitScoreCodeError("A grouped lyric token needs a closing ].", line);
+  const lyricMatch = value.slice(close + 1).match(/^\s*\{([^{}\r\n]+)\}/u);
+  if (!lyricMatch) throw new MoonlitScoreCodeError("A grouped note list must be followed by one lyric token, such as [3:.5 4:1]{爱}.", line);
+  const lyric = lyricMatch[1].trim();
+  if (!CHINESE_TOKEN.test(lyric) && !ENGLISH_TOKEN.test(lyric)) {
+    throw new MoonlitScoreCodeError("Lyrics must be one Chinese character or one English word per note group.", line);
+  }
+
+  const notes: CodeNote[] = [];
+  const body = value.slice(1, close);
+  let cursor = 0;
+  while (cursor < body.length) {
+    BARE_NOTE_AT.lastIndex = cursor;
+    const match = BARE_NOTE_AT.exec(body);
+    if (!match) throw new MoonlitScoreCodeError("Invalid grouped note. Use [3:.5 4:.5 5:1]{爱}.", line);
+    const note = codeNote(match[1], match[2], lyric, line);
+    if (note.pitches.length === 0) throw new MoonlitScoreCodeError("A lyric note group cannot contain a rest.", line);
+    notes.push(note);
+    cursor = BARE_NOTE_AT.lastIndex;
+  }
+  if (notes.length === 0) throw new MoonlitScoreCodeError("A lyric note group cannot be empty.", line);
+  const consumed = close + 1 + lyricMatch[0].length;
+  return Object.assign(notes, { consumed });
+}
+
+function parseNotes(value: string, line: number): CodeNote[] {
+  const notes: CodeNote[] = [];
+  let cursor = 0;
+  while (cursor < value.length) {
+    const remaining = value.slice(cursor);
+    if (/^\s*\[/u.test(remaining)) {
+      const leading = remaining.match(/^\s*/u)?.[0].length ?? 0;
+      const grouped = parseGroupedNotes(remaining.slice(leading), line) as CodeNote[] & { consumed: number };
+      notes.push(...grouped);
+      cursor += leading + grouped.consumed;
+    } else {
+      NOTE_AT.lastIndex = cursor;
+      const match = NOTE_AT.exec(value);
+      if (!match) throw new MoonlitScoreCodeError("Invalid note. Use pitch:beats{lyric}, for example 3:1{海}.", line);
+      cursor = NOTE_AT.lastIndex;
+      notes.push(codeNote(match[1], match[2], match[3]?.trim() || null, line));
+    }
     if (notes.length > MAX_EVENTS) {
       throw new MoonlitScoreCodeError(`A score may contain at most ${MAX_EVENTS} notes.`, line);
     }
@@ -256,7 +296,7 @@ export function compileMoonlitScoreCode(
   if (events.length === 0) throw new MoonlitScoreCodeError("The score contains only rests; add at least one playable note.", 1);
   if (events.length > MAX_EVENTS) throw new MoonlitScoreCodeError(`A score may contain at most ${MAX_EVENTS} playable notes.`, 1);
   const language = hasChinese ? "zh-CN" : "en";
-  const song: SongPackage = {
+  const song: SongPackage = normalizeSongPackage({
     id,
     title: headers.title,
     artist: headers.artist,
@@ -270,7 +310,7 @@ export function compileMoonlitScoreCode(
     provenance: ["moonlit-score-code-v1", `key-${headers.key}`, `meter-${headers.meter}`],
     phrases,
     events,
-  };
+  });
 
   return {
     id,
