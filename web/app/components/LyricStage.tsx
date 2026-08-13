@@ -1,5 +1,6 @@
 import { labelForCode } from "../lib/keyboard";
-import type { SongPackage } from "../lib/song";
+import type { LyricToken, SongPackage } from "../lib/song";
+import { normalizeSongPackage } from "../lib/song-normalizer";
 
 interface LyricStageProps {
   song: SongPackage;
@@ -10,13 +11,24 @@ const INSTRUMENTAL_ROUTE_LENGTH = 10;
 const LYRIC_UNIT = /\p{Script=Han}|[A-Za-z]+(?:'[A-Za-z]+)?|[^\p{Script=Han}A-Za-z]+/gu;
 const PLAYABLE_LYRIC_UNIT = /^(?:\p{Script=Han}|[A-Za-z]+(?:'[A-Za-z]+)?)$/u;
 
+type LyricPiece =
+  | { id: string; text: string; token: LyricToken }
+  | { id: string; text: string; token?: undefined };
+
+function tokenState(token: LyricToken, eventIndex: number): "done" | "current" | "upcoming" {
+  if (token.endEvent < eventIndex) return "done";
+  if (token.startEvent <= eventIndex && eventIndex <= token.endEvent) return "current";
+  return "upcoming";
+}
+
 export function LyricStage({ song, eventIndex }: LyricStageProps) {
-  const safeEventIndex = Math.min(eventIndex, Math.max(song.events.length - 1, 0));
-  const currentPhraseIndex = song.events[safeEventIndex]?.phraseIndex ?? song.phrases.length - 1;
-  const currentPhrase = song.phrases[currentPhraseIndex];
-  const nextPhrase = song.phrases[currentPhraseIndex + 1];
-  const phraseEvents = song.events.slice(currentPhrase.startEvent, currentPhrase.endEvent + 1);
-  const lyricPieces: Array<{ id: string; text: string; absoluteIndex?: number }> = [];
+  const displaySong = normalizeSongPackage(song);
+  const safeEventIndex = Math.min(eventIndex, Math.max(displaySong.events.length - 1, 0));
+  const currentPhraseIndex = displaySong.events[safeEventIndex]?.phraseIndex ?? displaySong.phrases.length - 1;
+  const currentPhrase = displaySong.phrases[currentPhraseIndex];
+  const nextPhrase = displaySong.phrases[currentPhraseIndex + 1];
+  const phraseEvents = displaySong.events.slice(currentPhrase.startEvent, currentPhrase.endEvent + 1);
+  const lyricPieces: LyricPiece[] = [];
   const instrumentalPhrase = phraseEvents.every((event) => event.token == null);
   const relativeEventIndex = Math.max(0, safeEventIndex - currentPhrase.startEvent);
   const instrumentalPageStart = Math.floor(relativeEventIndex / INSTRUMENTAL_ROUTE_LENGTH) * INSTRUMENTAL_ROUTE_LENGTH;
@@ -33,43 +45,44 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
       ? nextInstrumentalEvents.map((event) => labelForCode(event.targetCode)).join(" ")
       : "Let the final note find the room."
     : nextPhrase?.text ?? "Let the final note find the room.";
-  let eventOffset = 0;
 
   if (instrumentalPhrase) {
     visibleInstrumentalEvents.forEach((event, index) => {
+      const absoluteIndex = currentPhrase.startEvent + instrumentalPageStart + index;
       lyricPieces.push({
         id: event.id,
         text: labelForCode(event.targetCode),
-        absoluteIndex: currentPhrase.startEvent + instrumentalPageStart + index,
+        token: {
+          id: event.id,
+          phraseIndex: currentPhraseIndex,
+          tokenIndex: instrumentalPageStart + index,
+          text: labelForCode(event.targetCode),
+          startEvent: absoluteIndex,
+          endEvent: absoluteIndex,
+        },
       });
     });
   } else {
+    const phraseTokens = (displaySong.lyricTokens ?? [])
+      .filter((token) => token.phraseIndex === currentPhraseIndex)
+      .sort((left, right) => left.tokenIndex - right.tokenIndex);
     const units = currentPhrase.text.match(LYRIC_UNIT) ?? [];
+    let tokenOffset = 0;
+
     units.forEach((unit, unitIndex) => {
-      let matched = false;
-      while (
-        PLAYABLE_LYRIC_UNIT.test(unit) &&
-        phraseEvents[eventOffset]?.token === unit
-      ) {
-        const event = phraseEvents[eventOffset];
-        lyricPieces.push({
-          id: event.id,
-          text: unit,
-          absoluteIndex: currentPhrase.startEvent + eventOffset,
-        });
-        eventOffset += 1;
-        matched = true;
+      if (PLAYABLE_LYRIC_UNIT.test(unit)) {
+        const token = phraseTokens[tokenOffset];
+        if (token?.text === unit) {
+          lyricPieces.push({ id: token.id, text: unit, token });
+          tokenOffset += 1;
+          return;
+        }
       }
-      if (!matched) {
-        lyricPieces.push({ id: `${currentPhrase.id}-punctuation-${unitIndex}`, text: unit });
-      }
+      lyricPieces.push({ id: `${currentPhrase.id}-punctuation-${unitIndex}`, text: unit });
     });
-    phraseEvents.slice(eventOffset).forEach((event, remainingIndex) => {
-      lyricPieces.push({
-        id: event.id,
-        text: event.token ?? labelForCode(event.targetCode),
-        absoluteIndex: currentPhrase.startEvent + eventOffset + remainingIndex,
-      });
+
+    phraseTokens.slice(tokenOffset).forEach((token) => {
+      lyricPieces.push({ id: token.id, text: token.text, token });
     });
   }
 
@@ -77,27 +90,42 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
     <section className="lyric-stage" aria-label="Lyric-guided performance">
       <div className="lyric-meta">
         <span>CURRENT LINE</span>
-        <span>{String(currentPhraseIndex + 1).padStart(2, "0")} / {String(song.phrases.length).padStart(2, "0")}</span>
+        <span>{String(currentPhraseIndex + 1).padStart(2, "0")} / {String(displaySong.phrases.length).padStart(2, "0")}</span>
       </div>
 
       <div className="current-lyric">
-        <p className="lyric-line sr-only" lang={song.lyricLanguage}>{currentPhrase.text}</p>
-        <div className="lyric-progress" lang={song.lyricLanguage} aria-label={`Current lyric: ${currentPhrase.text}`}>
+        <p className="lyric-line sr-only" lang={displaySong.lyricLanguage}>{currentPhrase.text}</p>
+        <div className="lyric-progress" lang={displaySong.lyricLanguage} aria-label={`Current lyric: ${currentPhrase.text}`}>
           {lyricPieces.map((piece) => {
-            if (piece.absoluteIndex === undefined) {
+            if (!piece.token) {
               return <span className="lyric-punctuation" aria-hidden="true" key={piece.id}>{piece.text}</span>;
             }
-            const event = song.events[piece.absoluteIndex];
-            const absoluteIndex = piece.absoluteIndex;
-            const tokenState = absoluteIndex < eventIndex
-              ? "done"
-              : absoluteIndex === eventIndex
-                ? "current"
-                : "upcoming";
+            const state = tokenState(piece.token, eventIndex);
+            const event = state === "current" ? displaySong.events[eventIndex] : undefined;
+            const noteCount = piece.token.endEvent - piece.token.startEvent + 1;
             return (
               <span key={piece.id} className="lyric-token-wrap">
-                <span className="lyric-token" data-token-state={tokenState}>{piece.text}</span>
-                {tokenState === "current" && (
+                <span className="lyric-token" data-token-state={state}>{piece.text}</span>
+                {noteCount > 1 && (
+                  <span className="lyric-note-progress" aria-label={`${noteCount} notes for ${piece.text}`}>
+                    {Array.from({ length: noteCount }, (_, subIndex) => {
+                      const absoluteIndex = piece.token.startEvent + subIndex;
+                      const noteState = absoluteIndex < eventIndex
+                        ? "done"
+                        : absoluteIndex === eventIndex
+                          ? "current"
+                          : "upcoming";
+                      return (
+                        <i
+                          aria-label={`Note ${subIndex + 1} of ${noteCount}, ${noteState}`}
+                          data-note-state={noteState}
+                          key={`${piece.token.id}-note-${subIndex}`}
+                        />
+                      );
+                    })}
+                  </span>
+                )}
+                {event && (
                   <span className="lyric-key" aria-label={`Press ${labelForCode(event.targetCode)}`}>
                     {labelForCode(event.targetCode)}
                   </span>
@@ -110,7 +138,7 @@ export function LyricStage({ song, eventIndex }: LyricStageProps) {
 
       <div className="next-lyric">
         <span>NEXT LINE</span>
-        <p className="next-line" lang={instrumentalPhrase ? "en" : nextPhrase ? song.lyricLanguage : "en"}>{nextLineText}</p>
+        <p className="next-line" lang={instrumentalPhrase ? "en" : nextPhrase ? displaySong.lyricLanguage : "en"}>{nextLineText}</p>
       </div>
     </section>
   );

@@ -15,6 +15,11 @@ export const KEYBOARD_ROWS: KeyboardKey[][] = [
   letterKeys("ZXCVBNM"),
 ];
 
+export const SCREEN_KEYBOARD_ROWS: KeyboardKey[][] = [
+  ...KEYBOARD_ROWS,
+  [{ code: "Space", label: "SPACE", width: 5 }],
+];
+
 export const PERFORMANCE_CODES = KEYBOARD_ROWS.flat().map((item) => item.code);
 export const LYRIC_CONTINUATION_CODE = "Space";
 

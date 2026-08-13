@@ -501,12 +501,16 @@ select:focus-visible {
 .current-lyric { min-height: 123px; position: relative; display: grid; place-items: center; }
 .lyric-line, .lyric-progress { grid-area: 1 / 1; margin: 0; font-family: var(--serif); font-size: clamp(37px, 4.4vw, 60px); font-weight: 400; letter-spacing: .16em; line-height: 1.15; white-space: nowrap; }
 .lyric-progress { position: relative; display: flex; align-items: center; justify-content: center; }
-.lyric-token-wrap { position: relative; display: inline-flex; }
+.lyric-token-wrap { position: relative; display: inline-flex; flex-direction: column; align-items: center; }
 .lyric-punctuation { color: rgba(241, 231, 213, .4); }
 .lyric-token { color: rgba(241, 231, 213, .18); transition: color 180ms ease, text-shadow 180ms ease; }
 .lyric-token[data-token-state="done"] { color: var(--gold-light); }
 .lyric-token[data-token-state="current"] { color: #fff7e8; text-shadow: 0 0 30px rgba(230, 196, 131, .38); }
 .lyric-key { position: absolute; left: 50%; bottom: -30px; min-width: 26px; height: 22px; display: grid; place-items: center; transform: translateX(-58%); border: 1px solid rgba(234,212,165,.45); color: var(--gold-light); background: #1b0c12; font-family: var(--mono); font-size: 10px; letter-spacing: 0; }
+.lyric-note-progress { height: 7px; position: absolute; bottom: -10px; left: 50%; display: flex; gap: 4px; transform: translateX(-54%); }
+.lyric-note-progress i { width: 4px; height: 4px; border: 1px solid rgba(227,202,153,.38); border-radius: 50%; background: transparent; }
+.lyric-note-progress i[data-note-state="done"] { border-color: var(--gold); background: var(--gold); }
+.lyric-note-progress i[data-note-state="current"] { border-color: #fff2c8; background: #fff2c8; box-shadow: 0 0 8px rgba(240,205,137,.72); }
 .next-lyric { display: flex; justify-content: center; align-items: baseline; gap: 18px; color: var(--quiet); }
 .next-lyric > span { font-size: 9px; letter-spacing: .12em; }
 .next-line { margin: 0; color: var(--muted); font-family: var(--serif); font-size: 19px; letter-spacing: .13em; }

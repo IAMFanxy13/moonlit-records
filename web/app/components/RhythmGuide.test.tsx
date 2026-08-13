@@ -55,6 +55,17 @@ describe("RhythmGuide", () => {
     expect(screen.getByTestId("rhythm-event-1")).toHaveTextContent("2 0.3s");
   });
 
+  it("names a continuation event as SPACE in the highway", () => {
+    const continuationSong = {
+      ...timedSong,
+      events: [{ ...timedSong.events[0], targetCode: "Space" }],
+    };
+    render(<RhythmGuide song={continuationSong} eventIndex={0} />);
+
+    expect(screen.getByLabelText(/Current key SPACE/)).toBeInTheDocument();
+    expect(screen.getByText(/SPACE/, { selector: ".rhythm-caption strong" })).toBeInTheDocument();
+  });
+
   it("shows an explicit duration for taps as well as holds", () => {
     render(<RhythmGuide song={timedSong} eventIndex={1} />);
     expect(screen.getByText("GUIDE 0.3s · 2")).toBeInTheDocument();

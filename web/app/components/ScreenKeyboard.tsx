@@ -1,4 +1,4 @@
-import { KEYBOARD_ROWS } from "../lib/keyboard";
+import { SCREEN_KEYBOARD_ROWS } from "../lib/keyboard";
 
 export interface KeyFeedback {
   code: string;
@@ -16,11 +16,11 @@ export function ScreenKeyboard({ targetCode, feedback, pressedCodes }: ScreenKey
     <section className="keyboard-section" aria-label="Computer keyboard piano">
       <div className="keyboard-caption">
         <span>A free piano, with lyric initials as your guide.</span>
-        <span className="reserved-note"><i aria-hidden="true" />Numbers and letters. Nothing else to learn.</span>
+        <span className="reserved-note"><i aria-hidden="true" />Numbers, letters, and Space for lyric continuations.</span>
       </div>
 
       <div className="screen-keyboard">
-        {KEYBOARD_ROWS.map((row, rowIndex) => (
+        {SCREEN_KEYBOARD_ROWS.map((row, rowIndex) => (
           <div className={`keyboard-row row-${rowIndex}`} key={`row-${rowIndex}`}>
             {row.map((item) => {
               let state = item.disabled ? "disabled" : "idle";
@@ -38,7 +38,9 @@ export function ScreenKeyboard({ targetCode, feedback, pressedCodes }: ScreenKey
                   style={{ "--key-width": item.width ?? 1 } as React.CSSProperties}
                   tabIndex={-1}
                   type="button"
-                  aria-label={`${item.label}${item.disabled ? ", reserved system key" : " piano key"}`}
+                  aria-label={item.code === "Space"
+                    ? "SPACE continuation key"
+                    : `${item.label}${item.disabled ? ", reserved system key" : " piano key"}`}
                 >
                   <span>{item.label}</span>
                   {item.code === targetCode && <b aria-hidden="true" />}

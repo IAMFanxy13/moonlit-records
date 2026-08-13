@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { builtinSongs } from "../lib/songs";
 import { compileArrangement } from "../lib/arrangement-compiler";
+import { normalizeSongPackage } from "../lib/song-normalizer";
 import { LyricStage } from "./LyricStage";
 
 describe("LyricStage", () => {
@@ -77,7 +78,8 @@ describe("LyricStage", () => {
 
     const { container } = render(<LyricStage song={repeatedSong} eventIndex={4} />);
 
-    expect(container.querySelector(".lyric-progress")).toHaveTextContent("我我爱你");
+    expect(container.querySelector(".lyric-progress")).toHaveTextContent("我爱你");
+    expect(container.querySelectorAll(".lyric-token")).toHaveLength(3);
   });
 
   it("aligns English words as lyric units while preserving spaces", () => {
@@ -96,5 +98,58 @@ describe("LyricStage", () => {
     const { container } = render(<LyricStage song={englishSong} eventIndex={3} />);
 
     expect(container.querySelector(".lyric-progress")?.textContent).toBe("You are mine");
+  });
+
+  it("renders one lyric token with note-progress dots for a three-note melisma", () => {
+    const source = builtinSongs[0];
+    const song = normalizeSongPackage({
+      ...source,
+      phrases: [{ id: "love", text: "爱", startEvent: 0, endEvent: 2 }],
+      events: [0, 1, 2].map((index) => ({
+        ...source.events[0],
+        id: `love-${index}`,
+        phraseIndex: 0,
+        token: "爱",
+        targetCode: "KeyA",
+      })),
+      lyricTokens: undefined,
+    });
+
+    const { rerender, container } = render(<LyricStage song={song} eventIndex={0} />);
+    expect(container.querySelectorAll(".lyric-token")).toHaveLength(1);
+    expect(screen.getByText("爱", { selector: "[data-token-state='current']" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Note 1 of 3, current")).toBeInTheDocument();
+    expect(screen.getByLabelText("Press A")).toBeInTheDocument();
+
+    rerender(<LyricStage song={song} eventIndex={1} />);
+    expect(container.querySelectorAll(".lyric-token")).toHaveLength(1);
+    expect(screen.getByLabelText("Note 1 of 3, done")).toBeInTheDocument();
+    expect(screen.getByLabelText("Note 2 of 3, current")).toBeInTheDocument();
+    expect(screen.getByLabelText("Press SPACE")).toBeInTheDocument();
+
+    rerender(<LyricStage song={song} eventIndex={3} />);
+    expect(container.querySelectorAll("[data-note-state='done']")).toHaveLength(3);
+    expect(screen.queryByText("爱 爱 爱")).not.toBeInTheDocument();
+  });
+
+  it("keeps three genuinely repeated lyric characters as three separate tokens", () => {
+    const source = builtinSongs[0];
+    const song = normalizeSongPackage({
+      ...source,
+      phrases: [{ id: "three-loves", text: "爱爱爱", startEvent: 0, endEvent: 2 }],
+      events: [0, 1, 2].map((index) => ({
+        ...source.events[0],
+        id: `love-${index}`,
+        phraseIndex: 0,
+        token: "爱",
+        targetCode: "KeyA",
+      })),
+      lyricTokens: undefined,
+    });
+
+    const { container } = render(<LyricStage song={song} eventIndex={1} />);
+    expect(container.querySelectorAll(".lyric-token")).toHaveLength(3);
+    expect(container.querySelectorAll(".lyric-note-progress")).toHaveLength(0);
+    expect(screen.getByLabelText("Press A")).toBeInTheDocument();
   });
 });
