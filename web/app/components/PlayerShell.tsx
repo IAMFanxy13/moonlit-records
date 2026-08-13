@@ -16,6 +16,15 @@ import {
   togglePause,
   type PlayerState,
 } from "../lib/player-machine";
+import {
+  clearResonance,
+  createPhraseResonanceState,
+  deferVoice,
+  expireVoice,
+  MAX_RESONANCE_MS,
+  prepareAttack,
+  type ResonanceTransition,
+} from "../lib/phrase-resonance";
 import type { PianoVoice, SongPackage } from "../lib/song";
 import { normalizeSongPackage } from "../lib/song-normalizer";
 import { scaleSongTempo } from "../lib/tempo";
@@ -28,6 +37,14 @@ interface PlayerShellProps {
   piano: PianoPort;
   onExit: () => void;
   onComplete: (state: PlayerState) => void;
+}
+
+interface PlayedVoice {
+  handle: PianoKeyHandle;
+  kind: "correct" | "wrong" | "free";
+  eventIndex: number | null;
+  phraseIndex: number | null;
+  notes: readonly string[];
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -46,7 +63,10 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   const [restRemainingMs, setRestRemainingMs] = useState(
     () => performanceSong.events[0]?.restBeforeMs ?? 0,
   );
-  const attackedHandles = useRef(new Map<string, PianoKeyHandle>());
+  const attackedVoices = useRef(new Map<string, PlayedVoice>());
+  const resonance = useRef(createPhraseResonanceState());
+  const resonanceTimers = useRef(new Map<number, number>());
+  const [resonantVoiceCount, setResonantVoiceCount] = useState(0);
   const completedRests = useRef(new Set<string>());
   const completedOnce = useRef(false);
   const completionTimer = useRef<number | null>(null);
@@ -61,9 +81,20 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
   const progress = Math.round((playerState.eventIndex / performanceSong.events.length) * 100);
   const isResting = restRemainingMs > 0;
 
+  const applyResonanceTransition = useCallback((transition: ResonanceTransition) => {
+    resonance.current = transition.state;
+    transition.release.forEach((handle) => {
+      const timer = resonanceTimers.current.get(handle.id);
+      if (timer !== undefined) window.clearTimeout(timer);
+      resonanceTimers.current.delete(handle.id);
+      piano.keyUp(handle);
+    });
+    setResonantVoiceCount(transition.state.voices.length);
+  }, [piano]);
+
   const releaseEverything = useCallback(() => {
     piano.releaseAll();
-    attackedHandles.current.clear();
+    attackedVoices.current.clear();
     setPressedCodes(new Set());
   }, [piano]);
 
@@ -135,7 +166,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
       if (event.code === "Space") event.preventDefault();
       if (
         event.repeat ||
-        attackedHandles.current.has(event.code) ||
+        attackedVoices.current.has(event.code) ||
         isTypingTarget(event.target) ||
         !isPerformanceInputCode(event.code)
       ) return;
@@ -145,16 +176,37 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
       setPlayerState((current) => {
         if (isResting) {
           if (isPlayableCode(event.code)) {
-            const handle = piano.keyDown([defaultNoteFor(event.code)], 78);
-            attackedHandles.current.set(event.code, handle);
+            const notes = [defaultNoteFor(event.code)];
+            const handle = piano.keyDown(notes, 78);
+            attackedVoices.current.set(event.code, {
+              handle,
+              kind: "free",
+              eventIndex: null,
+              phraseIndex: null,
+              notes,
+            });
             setFeedback({ code: event.code, kind: "free" });
           }
           return current;
         }
+        const eventIndex = current.eventIndex;
         const result = pressKey(current, performanceSong, event.code, event.timeStamp);
         if (result.sound) {
+          if (result.sound.kind === "correct") {
+            applyResonanceTransition(
+              prepareAttack(resonance.current, performanceSong.events[eventIndex]),
+            );
+          }
           const handle = piano.keyDown(result.sound.notes, result.sound.velocity);
-          attackedHandles.current.set(event.code, handle);
+          attackedVoices.current.set(event.code, {
+            handle,
+            kind: result.sound.kind,
+            eventIndex: result.sound.kind === "correct" ? eventIndex : null,
+            phraseIndex: result.sound.kind === "correct"
+              ? performanceSong.events[eventIndex].phraseIndex
+              : null,
+            notes: result.sound.notes,
+          });
           setFeedback({ code: event.code, kind: result.sound.kind });
         }
         return result.state;
@@ -162,10 +214,25 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      const handle = attackedHandles.current.get(event.code);
-      if (handle) {
-        piano.keyUp(handle);
-        attackedHandles.current.delete(event.code);
+      const played = attackedVoices.current.get(event.code);
+      if (played) {
+        attackedVoices.current.delete(event.code);
+        if (played.kind === "correct" && played.phraseIndex !== null) {
+          applyResonanceTransition(deferVoice(resonance.current, {
+            id: played.handle.id,
+            handle: played.handle,
+            phraseIndex: played.phraseIndex,
+            notes: played.notes,
+            releasedAt: performance.now(),
+          }));
+          const timer = window.setTimeout(() => {
+            resonanceTimers.current.delete(played.handle.id);
+            applyResonanceTransition(expireVoice(resonance.current, played.handle.id));
+          }, MAX_RESONANCE_MS);
+          resonanceTimers.current.set(played.handle.id, timer);
+        } else {
+          piano.keyUp(played.handle);
+        }
       }
       setPlayerState((current) => {
         const result = releaseKey(current, performanceSong, event.code, event.timeStamp);
@@ -202,7 +269,7 @@ export function PlayerShell({ song, piano, onExit, onComplete }: PlayerShellProp
       cancelCompletionTimer();
       piano.releaseAll();
     };
-  }, [cancelCompletionTimer, isResting, performanceSong, piano, releaseEverything]);
+  }, [applyResonanceTransition, cancelCompletionTimer, isResting, performanceSong, piano, releaseEverything]);
 
   const feedbackCopy = useMemo(() => {
     if (playerState.status === "ringing") return "LET IT RING";

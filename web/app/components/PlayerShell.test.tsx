@@ -84,7 +84,7 @@ describe("PlayerShell", () => {
     expect(durationBar.compareDocumentPosition(keyboard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("attacks H while N is still held and each keyup releases only its own audio handle", () => {
+  it("attacks H while N is still held without waiting for keyup", () => {
     const piano = fakePiano();
     render(
       <PlayerShell
@@ -104,18 +104,36 @@ describe("PlayerShell", () => {
     expect(screen.getByText("2 / 8")).toBeInTheDocument();
     expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "pressed");
     expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "correct");
+  });
 
+  it("keeps a released correct N resonating while H attacks", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyN", key: "n" });
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
-    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ notes: builtinSongs[0].events[0].notes }));
-    expect(screen.getByTestId("key-KeyN")).toHaveAttribute("data-state", "idle");
-    expect(screen.getByTestId("key-KeyH")).toHaveAttribute("data-state", "correct");
+    expect(piano.keyUp).not.toHaveBeenCalled();
 
-    fireEvent.keyUp(window, { code: "KeyH", key: "h" });
-    expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ notes: builtinSongs[0].events[1].notes }));
+    fireEvent.keyDown(window, { code: "KeyH", key: "h" });
+    expect(piano.keyDown).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("2 / 8")).toBeInTheDocument();
+  });
+
+  it("releases wrong and paused free-play keys immediately", () => {
+    const piano = fakePiano();
+    render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
+
+    fireEvent.keyDown(window, { code: "KeyJ", key: "j" });
+    fireEvent.keyUp(window, { code: "KeyJ", key: "j" });
+    expect(piano.keyUp).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    fireEvent.keyDown(window, { code: "KeyK", key: "k" });
+    fireEvent.keyUp(window, { code: "KeyK", key: "k" });
     expect(piano.keyUp).toHaveBeenCalledTimes(2);
   });
 
-  it("holds one non-looping sample for seconds without browser-repeat attacks", () => {
+  it("holds one non-looping sample without repeat attacks and bounds its released resonance", () => {
     const piano = fakePiano();
     render(<PlayerShell song={builtinSongs[0]} piano={piano} onExit={vi.fn()} onComplete={vi.fn()} />);
 
@@ -126,6 +144,10 @@ describe("PlayerShell", () => {
     expect(piano.keyUp).not.toHaveBeenCalled();
 
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    expect(piano.keyUp).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(2_399));
+    expect(piano.keyUp).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
     expect(piano.keyUp).toHaveBeenCalledOnce();
   });
 
@@ -199,7 +221,7 @@ describe("PlayerShell", () => {
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it("attacks and releases a polyphonic song event from one computer key", () => {
+  it("attacks and defers a polyphonic song event as one physical voice", () => {
     const piano = fakePiano();
     const base = builtinSongs[0];
     const chordSong = {
@@ -212,6 +234,8 @@ describe("PlayerShell", () => {
     fireEvent.keyDown(window, { code: "KeyN", key: "n" });
     expect(piano.keyDown).toHaveBeenCalledWith(["C4", "E4", "G4"], chordSong.events[0].velocity);
     fireEvent.keyUp(window, { code: "KeyN", key: "n" });
+    expect(piano.keyUp).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(2_400));
     expect(piano.keyUp).toHaveBeenCalledWith(expect.objectContaining({ notes: ["C4", "E4", "G4"] }));
   });
 
