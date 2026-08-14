@@ -22,6 +22,47 @@ Moonlit Records turns ordinary typing gestures into a full, two-hand piano perfo
 
 There is no autoplay hiding behind the interface. Every note still waits for you.
 
+## 🖼️✨ Interface preview
+
+<div align="center">
+
+### 🎼 From score code to a private recital
+
+<img src="docs/images/01-score-atelier.png" alt="Moonlit Records score code atelier" width="100%" />
+
+<br><br>
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/02-repertoire.png" alt="Moonlit Records local repertoire" width="100%" />
+      <br><strong>📚 The night's repertoire</strong>
+      <br><sub>Local songs, prepared scores, piano voice suggestions, and search.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/03-performance-stage.png" alt="Moonlit Records full keyboard performance stage" width="100%" />
+      <br><strong>🎹 The performance stage</strong>
+      <br><sub>Note highway, shared duration guide, voice selector, and the full keyboard.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/04-lyric-guidance.png" alt="Moonlit Records lyric initial guidance" width="100%" />
+      <br><strong>🔤 Lyrics become playable gestures</strong>
+      <br><sub>One centred lyric line, visible initials, and the next phrase in view.</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/05-left-hand-space.png" alt="Moonlit Records left-hand Space cue" width="100%" />
+      <br><strong>🌌 Left-hand Space, exactly where it belongs</strong>
+      <br><sub>A distinct bass-and-harmony cue with its own musical duration.</sub>
+    </td>
+  </tr>
+</table>
+
+#### 🌙 Dark velvet · 🥂 warm gold · 🎻 concert-room restraint · ✨ zero visual noise
+
+</div>
+
 ## ✨ The idea
 
 Most virtual pianos ask beginners to think like pianists before they can sound musical. Moonlit Records starts somewhere more familiar: language.
