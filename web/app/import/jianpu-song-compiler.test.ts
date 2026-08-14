@@ -45,6 +45,7 @@ describe("compileJianpuSong", () => {
     const song = compileJianpuSong(scoreFixture(), "private-flower-sea");
 
     expect(song.tempoBpm).toBe(72);
+    expect(song.meter).toEqual({ beatsPerBar: 4, beatUnit: 4 });
     expect(song.title).toBe("花海");
     expect(song.events.map((event) => event.targetCode)).toEqual([
       "KeyN",

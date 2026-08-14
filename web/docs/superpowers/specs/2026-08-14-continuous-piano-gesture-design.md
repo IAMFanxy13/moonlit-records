@@ -29,7 +29,7 @@ No new user controls, no automatic next event, no score-driven future event atta
 
 `SongEventPart` gains optional `gestureType`: `block`, `softRollUp`, `rollUp`, `rollDown`, `grace`, or `octave`. Score/2 accepts only those names. Millisecond offsets remain internal templates, not author-provided arbitrary timing.
 
-Legacy `Digit2` and other lyric-free digit events normalize to Shift. Legacy independent Space events are folded at runtime into the nearest lyric event in the same phrase; new Score/2 authoring places left and right parts in the same event. Persisted source text is not rewritten.
+Legacy `Digit2` and other lyric-free digit events normalize to Shift. Space remains a real left-hand score event and may be authored or generated at four musically meaningful positions: before the first lyric, simultaneous with a lyric, exactly between adjacent lyrics, or after the final lyric. Persisted source text is not rewritten.
 
 ## Gesture templates
 
@@ -56,12 +56,12 @@ This keeps room resonance and left-hand tails continuous while preventing indefi
 
 ## UI
 
-- Remove before/between/after Space stars.
-- Each lyric token displays its letter, or `LETTER + SPACE` when that event requires a left part.
+- Keep one unobtrusive Space-star rail above the single lyric line. Empty stars preview future left-hand attacks, the current star lights and says `SPACE`, and completed stars disappear.
+- Project Space stars only to the four supported relations: phrase start, above a simultaneous lyric, midpoint between lyrics, and phrase end.
+- Each lyric token still displays its letter, or `LETTER + SPACE` when that event requires a simultaneous left part.
 - Instrumental lines, highway, screen keyboard and footer display `SHIFT`.
 - The duration bar remains advisory and never becomes a scoring system.
 
 ## Safety and tests
 
-Regression tests cover: 120ms either-order fusion; late recovery; ShiftLeft/ShiftRight canonical ownership; no keyboard repeat; no auto-advance; wrong-key free sound; overlapping physical keys; same-pitch reattack; gesture offsets and 180ms cap; voice-leading melody preservation and motion cost; same-phrase resonance; rest/phrase cleanup; legacy Space and Digit2 migration; UI removal of positional Space stars.
-
+Regression tests cover: 120ms either-order fusion; late recovery; ShiftLeft/ShiftRight canonical ownership; no keyboard repeat; no auto-advance; wrong-key free sound; overlapping physical keys; same-pitch reattack; gesture offsets and 180ms cap; voice-leading melody preservation and motion cost; same-phrase resonance; rest/phrase cleanup; legacy Digit migration; and generated Space cues at phrase start, simultaneous, midpoint, and phrase end.

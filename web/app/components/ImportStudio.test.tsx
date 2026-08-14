@@ -56,6 +56,8 @@ describe("ImportStudio", () => {
     render(<ImportStudio onImported={vi.fn()} onPerform={vi.fn()} />);
 
     expect(screen.getByRole("textbox", { name: "Paste Moonlit Score Code" })).toBeInTheDocument();
+    expect(screen.getByText(/MOONLIT-SCORE\/2/)).toBeInTheDocument();
+    expect(screen.getByText(/legacy MOONLIT-SCORE\/1 remains supported/i)).toBeInTheDocument();
     expect(screen.queryByLabelText("Choose score images or PDF")).not.toBeInTheDocument();
     expect(screen.queryByText(/PNG · JPEG · WEBP · PDF/)).not.toBeInTheDocument();
   });

@@ -1,5 +1,6 @@
 import type { PianoVoice } from "../lib/song";
 import { getPianoVoiceProfile, PIANO_VOICE_ORDER } from "./piano-voices";
+import { captureOwnedToneSources, createOwnedToneSourceHandle } from "./tone-source-adapter";
 
 export interface PianoKeyHandle {
   id: number;
@@ -9,7 +10,23 @@ export interface PianoKeyHandle {
 }
 
 export interface PianoVoiceHandle {
-  release(): void;
+  release(options?: PianoReleaseOptions): void;
+  scheduleRelease(delayMs: number | readonly number[], options?: PianoReleaseOptions): void;
+  cancelScheduledRelease(): void;
+}
+
+export interface PianoReleaseOptions {
+  fadeOutSeconds?: number;
+}
+
+export interface PianoRuntimeInfo {
+  state: string;
+  baseLatency: number | null;
+  latencyHint: string | number | null;
+  outputLatency?: number | null;
+  outputTimestamp?: { contextTime?: number; performanceTime?: number } | null;
+  currentTime?: number | null;
+  lookAhead?: number | null;
 }
 
 export interface PianoPort {
@@ -17,15 +34,20 @@ export interface PianoPort {
   resume(): Promise<void>;
   setVoice(voice: PianoVoice): void;
   tailMs(): number;
-  keyDown(notes: readonly string[], velocity: number): PianoKeyHandle;
-  keyUp(handle: PianoKeyHandle): void;
+  keyDown(notes: readonly string[], velocity: number | readonly number[], attackOffsetsMs?: readonly number[]): PianoKeyHandle;
+  keyUp(handle: PianoKeyHandle, options?: PianoReleaseOptions): void;
+  scheduleRelease(handle: PianoKeyHandle, delayMs: number | readonly number[], options?: PianoReleaseOptions): void;
+  cancelScheduledRelease(handle: PianoKeyHandle): void;
+  runtimeInfo(): PianoRuntimeInfo;
   releaseAll(): void;
   dispose(): void;
 }
 
 export interface PianoVoiceChannel {
-  keyDown(notes: readonly string[], normalizedVelocity: number): PianoVoiceHandle;
-  keyUp(handle: PianoVoiceHandle): void;
+  keyDown(notes: readonly string[], normalizedVelocity: number | readonly number[], attackOffsetsMs?: readonly number[]): PianoVoiceHandle;
+  keyUp(handle: PianoVoiceHandle, options?: PianoReleaseOptions): void;
+  scheduleRelease(handle: PianoVoiceHandle, delayMs: number | readonly number[], options?: PianoReleaseOptions): void;
+  cancelScheduledRelease(handle: PianoVoiceHandle): void;
   releaseAll(): void;
   dispose(): void;
 }
@@ -34,10 +56,11 @@ interface PianoEngineDependencies {
   channels: Record<PianoVoice, PianoVoiceChannel>;
   load: () => Promise<void>;
   resume: () => Promise<void>;
+  runtimeInfo?: () => PianoRuntimeInfo;
 }
 
 export function createPianoEngine(dependencies: PianoEngineDependencies): PianoPort {
-  const { channels, load, resume } = dependencies;
+  const { channels, load, resume, runtimeInfo } = dependencies;
   let activeVoice: PianoVoice = "warm";
   let nextHandleId = 1;
 
@@ -50,16 +73,28 @@ export function createPianoEngine(dependencies: PianoEngineDependencies): PianoP
     tailMs() {
       return getPianoVoiceProfile(activeVoice).tailMs;
     },
-    keyDown(notes, velocity) {
+    keyDown(notes, velocity, attackOffsetsMs) {
       const stableNotes = [...notes];
-      const channelHandle = channels[activeVoice].keyDown(
-        stableNotes,
-        Math.min(1, Math.max(0, velocity / 127)),
-      );
+      const normalizedVelocity = typeof velocity !== "number"
+        ? velocity.map((item) => Math.min(1, Math.max(0, item / 127)))
+        : Math.min(1, Math.max(0, velocity / 127));
+      const channelHandle = attackOffsetsMs
+        ? channels[activeVoice].keyDown(stableNotes, normalizedVelocity, [...attackOffsetsMs])
+        : channels[activeVoice].keyDown(stableNotes, normalizedVelocity);
       return { id: nextHandleId++, voice: activeVoice, notes: stableNotes, channelHandle };
     },
-    keyUp(handle) {
-      channels[handle.voice].keyUp(handle.channelHandle);
+    keyUp(handle, options) {
+      if (options) channels[handle.voice].keyUp(handle.channelHandle, options);
+      else channels[handle.voice].keyUp(handle.channelHandle);
+    },
+    scheduleRelease(handle, delayMs, options) {
+      channels[handle.voice].scheduleRelease(handle.channelHandle, delayMs, options);
+    },
+    cancelScheduledRelease(handle) {
+      channels[handle.voice].cancelScheduledRelease(handle.channelHandle);
+    },
+    runtimeInfo() {
+      return runtimeInfo?.() ?? { state: "unavailable", baseLatency: null, latencyHint: null };
     },
     releaseAll() {
       for (const channel of Object.values(channels)) channel.releaseAll();
@@ -90,16 +125,12 @@ const SAMPLE_URLS = {
 type ToneSampler = import("tone").Sampler;
 type ToneFilter = import("tone").Filter;
 type ToneReverb = import("tone").Reverb;
-type ToneBufferSource = import("tone").ToneBufferSource;
-
-interface ToneSamplerSources {
-  _activeSources: Map<number, ToneBufferSource[]>;
-}
-
+type ToneGain = import("tone").Gain;
 interface LoadedVoice {
   sampler: ToneSampler;
   filter: ToneFilter;
   reverb: ToneReverb;
+  output: ToneGain;
 }
 
 export function createBrowserPianoEngine(): PianoPort {
@@ -111,34 +142,40 @@ export function createBrowserPianoEngine(): PianoPort {
     PIANO_VOICE_ORDER.map((voice) => [
       voice,
       {
-        keyDown(notes: readonly string[], normalizedVelocity: number) {
+        keyDown(notes: readonly string[], normalizedVelocity: number | readonly number[], attackOffsetsMs?: readonly number[]) {
           const sampler = loaded.get(voice)?.sampler;
-          if (!sampler || !toneModule) return { release() {} };
-          const internals = sampler as unknown as ToneSamplerSources;
-          const before = new Map<number, Set<ToneBufferSource>>();
-          for (const note of notes) {
-            const midi = Math.round(toneModule.Frequency(note).toMidi());
-            before.set(midi, new Set(internals._activeSources.get(midi) ?? []));
+          if (!sampler || !toneModule) {
+            return {
+              release() {},
+              scheduleRelease() {},
+              cancelScheduledRelease() {},
+            };
           }
-          sampler.triggerAttack([...notes], undefined, normalizedVelocity);
-          const ownedSources = notes.flatMap((note) => {
-            const midi = Math.round(toneModule!.Frequency(note).toMidi());
-            const existing = before.get(midi) ?? new Set<ToneBufferSource>();
-            return (internals._activeSources.get(midi) ?? []).filter((source) => !existing.has(source));
+          const midiNotes = notes.map((note) => Math.round(toneModule!.Frequency(note).toMidi()));
+          const ownedSources = captureOwnedToneSources(sampler, midiNotes, () => {
+            if (!attackOffsetsMs && typeof normalizedVelocity === "number") {
+              sampler.triggerAttack([...notes], undefined, normalizedVelocity);
+              return;
+            }
+            const attackAt = toneModule!.now();
+            notes.forEach((note, index) => sampler.triggerAttack(
+              note,
+              attackAt + Math.max(0, attackOffsetsMs?.[index] ?? 0) / 1000,
+              typeof normalizedVelocity === "number"
+                ? normalizedVelocity
+                : normalizedVelocity[index] ?? normalizedVelocity.at(-1) ?? 0.7,
+            ));
           });
-          let released = false;
-          return {
-            release() {
-              if (released) return;
-              released = true;
-              for (const source of new Set(ownedSources)) {
-                if (source.state === "started") source.stop();
-              }
-            },
-          };
+          return createOwnedToneSourceHandle(ownedSources, () => toneModule!.now());
         },
-        keyUp(handle: PianoVoiceHandle) {
-          handle.release();
+        keyUp(handle: PianoVoiceHandle, options?: PianoReleaseOptions) {
+          handle.release(options);
+        },
+        scheduleRelease(handle, delayMs, options) {
+          handle.scheduleRelease(delayMs, options);
+        },
+        cancelScheduledRelease(handle) {
+          handle.cancelScheduledRelease();
         },
         releaseAll() {
           loaded.get(voice)?.sampler.releaseAll();
@@ -148,11 +185,12 @@ export function createBrowserPianoEngine(): PianoPort {
           chain?.sampler.dispose();
           chain?.filter.dispose();
           chain?.reverb.dispose();
+          chain?.output.dispose();
           loaded.delete(voice);
         },
       } satisfies PianoVoiceChannel,
     ]),
-  ) as Record<PianoVoice, PianoVoiceChannel>;
+  ) as unknown as Record<PianoVoice, PianoVoiceChannel>;
 
   const load = async () => {
     if (loading) return loading;
@@ -161,11 +199,12 @@ export function createBrowserPianoEngine(): PianoPort {
       toneModule = Tone;
       for (const voice of PIANO_VOICE_ORDER) {
         const profile = getPianoVoiceProfile(voice);
+        const output = new Tone.Gain({ gain: profile.outputTrim }).toDestination();
         const reverb = new Tone.Reverb({
           decay: profile.reverbDecay,
           preDelay: profile.preDelay,
           wet: profile.wet,
-        }).toDestination();
+        }).connect(output);
         const filter = new Tone.Filter({
           frequency: profile.cutoff,
           type: "lowpass",
@@ -178,7 +217,7 @@ export function createBrowserPianoEngine(): PianoPort {
           release: profile.damperRelease,
           curve: "exponential",
         }).connect(filter);
-        loaded.set(voice, { sampler, filter, reverb });
+        loaded.set(voice, { sampler, filter, reverb, output });
       }
       await Tone.loaded();
     })();
@@ -197,6 +236,20 @@ export function createBrowserPianoEngine(): PianoPort {
     async resume() {
       if (!toneModule) toneModule = await import("tone");
       await toneModule.start();
+    },
+    runtimeInfo() {
+      if (!toneModule) return { state: "unavailable", baseLatency: null, latencyHint: null };
+      const context = toneModule.getContext();
+      const raw = context.rawContext;
+      return {
+        state: raw.state,
+        baseLatency: "baseLatency" in raw ? raw.baseLatency : null,
+        outputLatency: "outputLatency" in raw ? raw.outputLatency : null,
+        outputTimestamp: "getOutputTimestamp" in raw ? raw.getOutputTimestamp() : null,
+        currentTime: raw.currentTime,
+        lookAhead: context.lookAhead,
+        latencyHint: context.latencyHint || null,
+      };
     },
   });
 }

@@ -14,7 +14,7 @@ line: 静止
 notes: 1:1{静} 0:.5 ^1+3+5:2{止}`;
 
 describe("compileMoonlitScoreCode", () => {
-  it("compiles one grouped lyric token into its initial followed by Space continuations", () => {
+  it("compiles one grouped lyric token into repeated fresh initial presses", () => {
     const record = compileMoonlitScoreCode(`MOONLIT-SCORE/1
 title: Melisma
 artist: Moonlit
@@ -31,7 +31,7 @@ notes: [3:.5 4:.5 5:1]{爱}`);
       startEvent: 0,
       endEvent: 2,
     })]);
-    expect(record.song.events.map((event) => event.targetCode)).toEqual(["KeyA", "Space", "Space"]);
+    expect(record.song.events.map((event) => event.targetCode)).toEqual(["KeyA", "KeyA", "KeyA"]);
     expect(record.song.events.map((event) => event.notes[0])).toEqual(["E4", "F4", "G4"]);
   });
 
@@ -47,7 +47,7 @@ voice: felt
 line: 爱
 notes: 3:.5{爱} 4:.5{爱} 5:1{爱}`);
 
-    expect(record.song.events.map((event) => event.targetCode)).toEqual(["KeyA", "Space", "Space"]);
+    expect(record.song.events.map((event) => event.targetCode)).toEqual(["KeyA", "KeyA", "KeyA"]);
   });
 
   it("compiles Chinese initials, rests, octave marks, and one-key chords", () => {
@@ -65,6 +65,7 @@ notes: 3:.5{爱} 4:.5{爱} 5:1{爱}`);
       title: "花海",
       artist: "周杰伦",
       tempoBpm: 72,
+      meter: { beatsPerBar: 4, beatUnit: 4 },
       recommendedPiano: "warm",
       lyricLanguage: "zh-CN",
       quality: "clear",
@@ -98,7 +99,7 @@ notes: 1:.25{You} 2:.25{are} 3:.25{mine}`);
     expect(record.song.events.every((event) => event.kind === "tap")).toBe(true);
   });
 
-  it("uses the repeating 1 through 0 route for lyric-free notes", () => {
+  it("uses Shift for lyric-free right-hand notes", () => {
     const notes = Array.from({ length: 11 }, (_, index) => `${index % 7 + 1}:1`).join(" ");
     const record = compileMoonlitScoreCode(`MOONLIT-SCORE/1
 title: Interlude
@@ -111,10 +112,9 @@ voice: concert
 line: Instrumental
 notes: ${notes}`);
 
-    expect(record.song.events.map((event) => event.targetCode)).toEqual([
-      "Digit1", "Digit2", "Digit3", "Digit4", "Digit5",
-      "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Digit1",
-    ]);
+    expect(record.song.events.map((event) => event.targetCode)).toEqual(
+      Array.from({ length: 11 }, () => "Shift"),
+    );
   });
 
   it("compacts phrase indexes around leading and middle rest-only rows", () => {
@@ -165,7 +165,7 @@ notes: 0:4`)).toThrow("only rests");
   });
 
   it.each([
-    ["unknown version", "MOONLIT-SCORE/2\ntitle: A", 1],
+    ["unknown version", "MOONLIT-SCORE/3\ntitle: A", 1],
     ["missing header", "MOONLIT-SCORE/1\ntitle: A", 2],
     ["invalid note", `MOONLIT-SCORE/1\ntitle: A\nartist: B\nkey: C\nmeter: 4/4\ntempo: 72\nvoice: felt\nline: A\nnotes: 8:1{A}`, 9],
     ["script text", `MOONLIT-SCORE/1\ntitle: A\nartist: B\nkey: C\nmeter: 4/4\ntempo: 72\nvoice: felt\n<script>alert(1)</script>`, 8],

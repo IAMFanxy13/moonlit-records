@@ -33,7 +33,9 @@ export function ImportStudio({ onImported, onPerform }: ImportStudioProps) {
       <p className="eyebrow">PRIVATE SCORE ATELIER</p>
       <h1 id="import-title">Paste your score code</h1>
       <p className="import-intro">
-        Bring a Moonlit Score Code prepared for you. The instrument reads only its versioned music grammar, then saves the arrangement on this device.
+        Paste a full two-hand <strong>MOONLIT-SCORE/2</strong> arrangement. Legacy
+        MOONLIT-SCORE/1 remains supported; both formats stay declarative and are saved only
+        on this device.
       </p>
 
       <div className="score-code-editor">
@@ -45,7 +47,7 @@ export function ImportStudio({ onImported, onPerform }: ImportStudioProps) {
           aria-label="Paste Moonlit Score Code"
           autoCapitalize="off"
           autoCorrect="off"
-          placeholder={`MOONLIT-SCORE/1\ntitle: ...\nartist: ...\nkey: C\nmeter: 4/4\ntempo: 72\nvoice: felt`}
+          placeholder={`MOONLIT-SCORE/2\n{\n  "meta": { "title": "...", "artist": "...", "key": "C", "mode": "major", "meter": "4/4", "tempo": 72, "voice": "felt" },\n  "phrases": [...]\n}`}
           spellCheck={false}
           value={code}
           onChange={(event) => {

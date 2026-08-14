@@ -6,17 +6,19 @@ export interface KeyFeedback {
 }
 
 interface ScreenKeyboardProps {
-  targetCode: string | null;
+  targetCode?: string | null;
+  targetCodes?: string[];
   feedback: KeyFeedback | null;
   pressedCodes: Set<string>;
 }
 
-export function ScreenKeyboard({ targetCode, feedback, pressedCodes }: ScreenKeyboardProps) {
+export function ScreenKeyboard({ targetCode, targetCodes, feedback, pressedCodes }: ScreenKeyboardProps) {
+  const targets = new Set(targetCodes ?? (targetCode ? [targetCode] : []));
   return (
     <section className="keyboard-section" aria-label="Computer keyboard piano">
       <div className="keyboard-caption">
-        <span>A free piano, with lyric initials as your guide.</span>
-        <span className="reserved-note"><i aria-hidden="true" />Numbers, letters, and Space for lyric continuations.</span>
+        <span>Right-hand lyrics, left-hand harmony — every note still waits for you.</span>
+        <span className="reserved-note"><i aria-hidden="true" />A–Z lyric melody · A–Z + Space two hands · Shift instrumental.</span>
       </div>
 
       <div className="screen-keyboard">
@@ -26,7 +28,7 @@ export function ScreenKeyboard({ targetCode, feedback, pressedCodes }: ScreenKey
               let state = item.disabled ? "disabled" : "idle";
               if (pressedCodes.has(item.code)) state = "pressed";
               if (feedback?.code === item.code) state = feedback.kind;
-              if (item.code === targetCode) state = "target";
+              if (targets.has(item.code)) state = "target";
 
               return (
                 <button
@@ -38,12 +40,10 @@ export function ScreenKeyboard({ targetCode, feedback, pressedCodes }: ScreenKey
                   style={{ "--key-width": item.width ?? 1 } as React.CSSProperties}
                   tabIndex={-1}
                   type="button"
-                  aria-label={item.code === "Space"
-                    ? "SPACE continuation key"
-                    : `${item.label}${item.disabled ? ", reserved system key" : " piano key"}`}
+                  aria-label={`${item.label}${targets.has(item.code) ? ", target" : " piano key"}`}
                 >
                   <span>{item.label}</span>
-                  {item.code === targetCode && <b aria-hidden="true" />}
+                  {targets.has(item.code) && <b aria-hidden="true" />}
                 </button>
               );
             })}

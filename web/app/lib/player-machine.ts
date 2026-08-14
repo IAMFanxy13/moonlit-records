@@ -1,5 +1,5 @@
-import { defaultNoteFor, isPerformanceInputCode, isPlayableCode } from "./keyboard";
-import type { SongPackage } from "./song";
+import { canonicalPerformanceCode, defaultNoteFor, eventInputCodes, isPerformanceInputCode, isPlayableCode } from "./keyboard";
+import type { SongEventPart, SongPackage } from "./song";
 
 export interface Mistake {
   eventIndex: number;
@@ -18,6 +18,12 @@ export interface PlayerState {
     code: string;
     startedAt: number;
   }>;
+  completedPartCodes?: string[];
+  pendingEventInput?: {
+    eventIndex: number;
+    startedAt: number;
+    firstCode: string;
+  };
 }
 
 export interface PianoSound {
@@ -29,7 +35,14 @@ export interface PianoSound {
 export interface KeyResult {
   state: PlayerState;
   sound: PianoSound | null;
+  partStarted?: string;
+  firstPart?: boolean;
+  eventCompleted?: boolean;
+  gesture?: SongEventPart;
+  fusion?: "first" | "fused" | "late";
 }
+
+export const TWO_HAND_FUSION_WINDOW_MS = 120;
 
 export function createPlayerState(song: SongPackage): PlayerState {
   return {
@@ -38,6 +51,8 @@ export function createPlayerState(song: SongPackage): PlayerState {
     correctCount: 0,
     mistakes: [],
     activeHolds: {},
+    completedPartCodes: [],
+    pendingEventInput: undefined,
   };
 }
 
@@ -46,7 +61,7 @@ export function startPlayer(state: PlayerState): PlayerState {
 }
 
 export function togglePause(state: PlayerState): PlayerState {
-  if (state.status === "playing") return { ...state, status: "paused", activeHolds: {} };
+  if (state.status === "playing") return { ...state, status: "paused", activeHolds: {}, completedPartCodes: [], pendingEventInput: undefined };
   if (state.status === "paused") return { ...state, status: "playing" };
   return state;
 }
@@ -59,6 +74,8 @@ export function restartPlayer(state: PlayerState): PlayerState {
     correctCount: 0,
     mistakes: [],
     activeHolds: {},
+    completedPartCodes: [],
+    pendingEventInput: undefined,
   };
 }
 
@@ -77,6 +94,40 @@ export function rewindPhrase(state: PlayerState, song: SongPackage): PlayerState
     correctCount: startEvent,
     mistakes: state.mistakes.filter((mistake) => mistake.eventIndex < startEvent),
     activeHolds: {},
+    completedPartCodes: [],
+    pendingEventInput: undefined,
+  };
+}
+
+export function seekPlayerToPhrase(
+  state: PlayerState,
+  song: SongPackage,
+  requestedPhraseIndex: number,
+): PlayerState {
+  if (song.events.length === 0 || song.phrases.length === 0) {
+    return { ...state, status: "complete", eventIndex: 0, correctCount: 0, activeHolds: {}, completedPartCodes: [], pendingEventInput: undefined };
+  }
+  const phraseIndex = Math.min(
+    song.phrases.length - 1,
+    Math.max(0, Math.round(requestedPhraseIndex)),
+  );
+  const phrase = song.phrases[phraseIndex];
+  let startEvent = phrase.startEvent;
+  for (let index = phrase.startEvent; index <= phrase.endEvent; index += 1) {
+    if (isPerformanceInputCode(song.events[index]?.targetCode ?? "")) {
+      startEvent = index;
+      break;
+    }
+  }
+  return {
+    ...state,
+    status: state.status === "paused" ? "paused" : "playing",
+    eventIndex: startEvent,
+    correctCount: startEvent,
+    mistakes: state.mistakes.filter((mistake) => mistake.eventIndex < startEvent),
+    activeHolds: {},
+    completedPartCodes: [],
+    pendingEventInput: undefined,
   };
 }
 
@@ -87,7 +138,17 @@ function advance(state: PlayerState, song: SongPackage): PlayerState {
     eventIndex: nextEventIndex,
     correctCount: state.correctCount + 1,
     status: nextEventIndex === song.events.length ? "ringing" : "playing",
+    completedPartCodes: [],
+    pendingEventInput: undefined,
   };
+}
+
+function partsForEvent(song: SongPackage, eventIndex: number): SongEventPart[] {
+  const event = song.events[eventIndex];
+  if (!event) return [];
+  return event.parts?.length
+    ? event.parts
+    : [{ hand: event.targetCode === "Space" ? "left" : "right", targetCode: event.targetCode, notes: event.notes }];
 }
 
 export function pressKey(
@@ -97,12 +158,13 @@ export function pressKey(
   now = Date.now(),
 ): KeyResult {
   if (!isPerformanceInputCode(code) || state.status === "complete") return { state, sound: null };
+  const canonicalCode = canonicalPerformanceCode(code);
 
   if (state.status !== "playing") {
     return {
       state,
-      sound: isPlayableCode(code)
-        ? { notes: [defaultNoteFor(code)], velocity: 78, kind: "free" }
+      sound: isPlayableCode(canonicalCode)
+        ? { notes: [defaultNoteFor(canonicalCode)], velocity: 78, kind: "free" }
         : null,
     };
   }
@@ -110,8 +172,10 @@ export function pressKey(
   const currentEvent = song.events[state.eventIndex];
   if (!currentEvent) return { state: { ...state, status: "complete" }, sound: null };
 
-  if (code !== currentEvent.targetCode) {
-    if (!isPlayableCode(code)) return { state, sound: null };
+  const parts = partsForEvent(song, state.eventIndex);
+  const part = parts.find((candidate) => canonicalPerformanceCode(candidate.targetCode) === canonicalCode);
+  if (!part) {
+    if (!isPlayableCode(canonicalCode)) return { state, sound: null };
     return {
       state: {
         ...state,
@@ -120,26 +184,53 @@ export function pressKey(
           {
             eventIndex: state.eventIndex,
             token: currentEvent.token,
-            pressedCode: code,
-            expectedCode: currentEvent.targetCode,
+            pressedCode: canonicalCode,
+            expectedCode: eventInputCodes(currentEvent).join("+"),
           },
         ],
       },
-      sound: { notes: [defaultNoteFor(code)], velocity: currentEvent.velocity, kind: "wrong" },
+      sound: { notes: [defaultNoteFor(canonicalCode)], velocity: currentEvent.velocity, kind: "wrong" },
     };
   }
 
-  if (state.activeHolds[code]) return { state, sound: null };
+  const alreadyCompleted = state.completedPartCodes ?? [];
+  if (state.activeHolds[code] || alreadyCompleted.includes(canonicalCode)) {
+    return { state, sound: null };
+  }
+  const firstPart = alreadyCompleted.length === 0;
+  const pendingEventInput = firstPart
+    ? { eventIndex: state.eventIndex, startedAt: now, firstCode: canonicalCode }
+    : state.pendingEventInput;
+  const fusion = firstPart
+    ? "first" as const
+    : pendingEventInput && now - pendingEventInput.startedAt <= TWO_HAND_FUSION_WINDOW_MS
+      ? "fused" as const
+      : "late" as const;
+  const completedPartCodes = [...alreadyCompleted, canonicalCode];
   const withHold: PlayerState = {
     ...state,
     activeHolds: {
       ...state.activeHolds,
       [code]: { eventIndex: state.eventIndex, code, startedAt: now },
     },
+    completedPartCodes,
+    pendingEventInput,
   };
+  const eventCompleted = parts.every((candidate) => completedPartCodes.includes(
+    canonicalPerformanceCode(candidate.targetCode),
+  ));
   return {
-    state: advance(withHold, song),
-    sound: { notes: currentEvent.notes, velocity: currentEvent.velocity, kind: "correct" },
+    state: eventCompleted ? advance(withHold, song) : withHold,
+    sound: {
+      notes: part.notes,
+      velocity: part.velocity ?? currentEvent.velocity,
+      kind: "correct",
+    },
+    partStarted: canonicalCode,
+    firstPart,
+    eventCompleted,
+    gesture: part,
+    fusion,
   };
 }
 

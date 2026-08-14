@@ -1,4 +1,8 @@
 import type { SongEvent, SongPackage } from "./song";
+import { arrangeTwoHandSong } from "./two-hand-arranger";
+
+const BUILTIN_TEMPO_BPM = 72;
+const BUILTIN_BEAT_MS = 60_000 / BUILTIN_TEMPO_BPM;
 
 function lyricEvents(
   songId: string,
@@ -8,19 +12,25 @@ function lyricEvents(
   notes: string[],
   offset: number,
 ): SongEvent[] {
-  return tokens.map((token, tokenIndex) => ({
-    id: `${songId}-${offset + tokenIndex}`,
-    phraseIndex,
-    tokenIndex,
-    token,
-    targetCode: targetCodes[tokenIndex],
-    notes: [notes[tokenIndex]],
-    note: notes[tokenIndex],
-    velocity: 92,
-    kind: "tap" as const,
-    confidence: 1,
-    provenance: ["curated"],
-  }));
+  return tokens.map((token, tokenIndex) => {
+    const sourceStartMs = Math.round((offset + tokenIndex) * BUILTIN_BEAT_MS);
+    return {
+      id: `${songId}-${offset + tokenIndex}`,
+      phraseIndex,
+      tokenIndex,
+      token,
+      targetCode: targetCodes[tokenIndex],
+      notes: [notes[tokenIndex]],
+      note: notes[tokenIndex],
+      velocity: 92,
+      kind: "tap" as const,
+      holdMs: Math.round(BUILTIN_BEAT_MS * 0.82),
+      sourceStartMs,
+      sourceEndMs: sourceStartMs + Math.round(BUILTIN_BEAT_MS * 0.82),
+      confidence: 1,
+      provenance: ["curated", "curated-score-time"],
+    };
+  });
 }
 
 const moonlightEvents = [
@@ -105,6 +115,9 @@ const odeEvents: SongEvent[] = odeNotes.map((note, index) => ({
   note,
   velocity: 92,
   kind: "tap",
+  holdMs: Math.round(BUILTIN_BEAT_MS * 0.82),
+  sourceStartMs: Math.round(index * BUILTIN_BEAT_MS),
+  sourceEndMs: Math.round(index * BUILTIN_BEAT_MS + BUILTIN_BEAT_MS * 0.82),
   confidence: 1,
   provenance: ["curated"],
 }));
@@ -118,6 +131,9 @@ export const builtinSongs: SongPackage[] = [
     searchAliases: ["你好月光", "你好，月光", "月光", "原创", "夜航练习版"],
     lyricLanguage: "zh-CN",
     durationLabel: "00:28",
+    tempoBpm: BUILTIN_TEMPO_BPM,
+    meter: { beatsPerBar: 4, beatUnit: 4 },
+    keySignature: { tonic: "C", mode: "major" },
     recommendedPiano: "warm",
     quality: "clear",
     provenance: ["curated"],
@@ -135,6 +151,9 @@ export const builtinSongs: SongPackage[] = [
     searchAliases: ["小星星", "一闪一闪亮晶晶", "佚名", "童谣"],
     lyricLanguage: "zh-CN",
     durationLabel: "01:12",
+    tempoBpm: BUILTIN_TEMPO_BPM,
+    meter: { beatsPerBar: 4, beatUnit: 4 },
+    keySignature: { tonic: "C", mode: "major" },
     recommendedPiano: "bright",
     quality: "clear",
     provenance: ["public-domain-melody", "curated"],
@@ -156,6 +175,9 @@ export const builtinSongs: SongPackage[] = [
     searchAliases: ["欢乐颂", "贝多芬", "片段", "无歌词"],
     lyricLanguage: "zh-CN",
     durationLabel: "00:24",
+    tempoBpm: BUILTIN_TEMPO_BPM,
+    meter: { beatsPerBar: 4, beatUnit: 4 },
+    keySignature: { tonic: "C", mode: "major" },
     recommendedPiano: "concert",
     quality: "clear",
     provenance: ["public-domain-melody", "curated"],
@@ -166,3 +188,6 @@ export const builtinSongs: SongPackage[] = [
     events: odeEvents,
   },
 ];
+
+/** Runtime catalogue: every built-in uses the same compatibility preparation as pasted V1 scores. */
+export const preparedBuiltinSongs: SongPackage[] = builtinSongs.map(arrangeTwoHandSong);

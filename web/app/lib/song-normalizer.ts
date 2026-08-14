@@ -1,4 +1,10 @@
-import type { LyricToken, Phrase, SongEvent, SongPackage } from "./song";
+import {
+  canonicalScoreTargetCode,
+  INSTRUMENTAL_MELODY_CODE,
+  LEFT_HAND_CODE,
+} from "./keyboard";
+import { lyricTargetCode } from "./lyric-input";
+import type { LyricToken, Phrase, SongEvent, SongEventPart, SongPackage } from "./song";
 
 const LYRIC_UNIT = /\p{Script=Han}|[A-Za-z]+(?:'[A-Za-z]+)?/gu;
 
@@ -72,8 +78,29 @@ function deriveLegacyTokens(song: SongPackage, events: SongEvent[]): LyricToken[
   ));
 }
 
+function normalizedParts(event: SongEvent): SongEventPart[] {
+  const source = event.parts?.length
+    ? event.parts
+    : [{
+      hand: event.targetCode === "Space" ? "left" as const : "right" as const,
+      targetCode: event.targetCode,
+      notes: event.notes,
+    }];
+  return source.map((part) => ({
+    ...part,
+    targetCode: canonicalScoreTargetCode(part.targetCode),
+    notes: [...part.notes],
+    velocities: part.velocities ? [...part.velocities] : undefined,
+    durationsMs: part.durationsMs ? [...part.durationsMs] : undefined,
+  }));
+}
+
 export function normalizeSongPackage(song: SongPackage): SongPackage {
-  const events = song.events.map((event) => ({ ...event }));
+  const events = song.events.map((event) => ({
+    ...event,
+    notes: [...event.notes],
+    parts: normalizedParts(event),
+  }));
   const sourceTokens = song.lyricTokens?.map((token) => ({ ...token }))
     ?? deriveLegacyTokens(song, events);
 
@@ -85,19 +112,36 @@ export function normalizeSongPackage(song: SongPackage): SongPackage {
 
   const lyricTokens = sourceTokens.map((token) => ({ ...token }));
   for (const token of lyricTokens) {
-    const subCount = token.endEvent - token.startEvent + 1;
+    const ownedEventIndexes: number[] = [];
     for (let eventIndex = token.startEvent; eventIndex <= token.endEvent; eventIndex += 1) {
       const event = events[eventIndex];
-      if (!event) continue;
-      const subIndex = eventIndex - token.startEvent;
+      if (event?.token === token.text && event.parts?.some((part) => part.hand === "right")) {
+        ownedEventIndexes.push(eventIndex);
+      }
+    }
+    const subCount = ownedEventIndexes.length;
+    const tokenTargetCode = lyricTargetCode(token.text);
+    ownedEventIndexes.forEach((eventIndex, subIndex) => {
+      const event = events[eventIndex];
+      if (!event) return;
       event.phraseIndex = token.phraseIndex;
       event.tokenIndex = token.tokenIndex;
       event.token = token.text;
       event.lyricTokenId = token.id;
       event.lyricSubIndex = subIndex;
       event.lyricSubCount = subCount;
-      if (subIndex > 0) event.targetCode = "Space";
+      event.targetCode = tokenTargetCode;
+    });
+  }
+
+  for (const event of events) {
+    event.targetCode = canonicalScoreTargetCode(event.targetCode);
+    if (event.lyricTokenId == null && /^Digit\d$/u.test(event.targetCode)) {
+      event.targetCode = INSTRUMENTAL_MELODY_CODE;
     }
+    event.parts = (event.parts ?? []).map((part) => part.hand === "right"
+      ? { ...part, targetCode: event.targetCode, notes: [...part.notes], velocities: part.velocities ? [...part.velocities] : undefined, durationsMs: part.durationsMs ? [...part.durationsMs] : undefined }
+      : { ...part, targetCode: LEFT_HAND_CODE, notes: [...part.notes], velocities: part.velocities ? [...part.velocities] : undefined, durationsMs: part.durationsMs ? [...part.durationsMs] : undefined });
   }
 
   return {

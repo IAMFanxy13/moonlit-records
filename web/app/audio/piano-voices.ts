@@ -10,6 +10,22 @@ export interface PianoVoiceProfile {
   preDelay: number;
   wet: number;
   tailMs: number;
+  /** Linear gain after the room stage, leaving headroom for overlap and chords. */
+  outputTrim: number;
+  /** Relative size of the short virtual-damper connection window. */
+  legato: number;
+  /** Key-release fade used while another melody note is expected. */
+  connectedRelease: number;
+  /** Key-release fade after a deliberately long score note. */
+  longRelease: number;
+  /** Key-release fade at a phrase boundary. */
+  phraseRelease: number;
+  /** Prompt damper fade before printed silence. */
+  restRelease: number;
+  /** Maximum pre-release resonance for a long note. */
+  longNoteGraceMs: number;
+  /** Maximum pre-release resonance at the end of a phrase. */
+  phraseTailMs: number;
 }
 
 export const PIANO_VOICE_ORDER: PianoVoice[] = ["warm", "bright", "upright", "concert"];
@@ -24,6 +40,14 @@ const PIANO_VOICE_PROFILES: Record<PianoVoice, PianoVoiceProfile> = {
     preDelay: 0.018,
     wet: 0.26,
     tailMs: 5900,
+    outputTrim: 0.74,
+    legato: 1.08,
+    connectedRelease: 0.34,
+    longRelease: 0.43,
+    phraseRelease: 0.5,
+    restRelease: 0.16,
+    longNoteGraceMs: 420,
+    phraseTailMs: 820,
   },
   bright: {
     name: "Studio Grand",
@@ -34,6 +58,14 @@ const PIANO_VOICE_PROFILES: Record<PianoVoice, PianoVoiceProfile> = {
     preDelay: 0.014,
     wet: 0.2,
     tailMs: 4500,
+    outputTrim: 0.78,
+    legato: 1,
+    connectedRelease: 0.26,
+    longRelease: 0.34,
+    phraseRelease: 0.42,
+    restRelease: 0.13,
+    longNoteGraceMs: 340,
+    phraseTailMs: 680,
   },
   upright: {
     name: "Vintage Upright",
@@ -44,6 +76,14 @@ const PIANO_VOICE_PROFILES: Record<PianoVoice, PianoVoiceProfile> = {
     preDelay: 0.012,
     wet: 0.16,
     tailMs: 3500,
+    outputTrim: 0.8,
+    legato: 0.86,
+    connectedRelease: 0.2,
+    longRelease: 0.28,
+    phraseRelease: 0.34,
+    restRelease: 0.11,
+    longNoteGraceMs: 270,
+    phraseTailMs: 520,
   },
   concert: {
     name: "Concert Grand",
@@ -54,6 +94,14 @@ const PIANO_VOICE_PROFILES: Record<PianoVoice, PianoVoiceProfile> = {
     preDelay: 0.028,
     wet: 0.32,
     tailMs: 7200,
+    outputTrim: 0.7,
+    legato: 1.12,
+    connectedRelease: 0.38,
+    longRelease: 0.48,
+    phraseRelease: 0.58,
+    restRelease: 0.17,
+    longNoteGraceMs: 480,
+    phraseTailMs: 940,
   },
 };
 

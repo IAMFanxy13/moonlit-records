@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace digit-based instrumental control and positional Space cues with A–Z / A–Z+Space / Shift input while adding deterministic piano gestures, voice leading, and phrase-aware continuity.
+**Goal:** Replace digit-based instrumental control with A–Z / Space / Shift input, retain clearly projected four-position Space cues, and add deterministic piano gestures, voice leading, and phrase-aware continuity.
 
 **Architecture:** Preserve the current player state machine, owned Tone source handles, sampler channels, release plans, and two-hand score parts. Add small pure planning modules between normalized score events and the existing audio engine, then wire them into `PlayerShell` without introducing automatic event playback.
 
@@ -63,7 +63,7 @@
 - [ ] Wire diagnostics/UI state in `PlayerShell` without delaying `piano.keyDown`.
 - [ ] Re-run focused tests and confirm pass.
 
-### Task 3: Fold legacy Space into lyric events and simplify cues
+### Task 3: Preserve and generate four-position Space cues
 
 **Files:**
 - Create: `app/lib/score-input-migration.ts`
@@ -77,14 +77,14 @@
 - Modify: `app/globals.css`
 
 **Interfaces:**
-- Produces `migratePerformanceInputs(song): SongPackage`, merging standalone legacy left parts into the nearest lyric event in the same phrase while preserving lyric token ownership.
-- UI consumes `eventInputLabel` and shows `LETTER + SPACE`; positional cue rendering is removed.
+- `two-hand-arranger.ts` may generate standalone or simultaneous Space parts at phrase start, phrase end, a lyric onset, or the midpoint between two lyric onsets.
+- `left-hand-cues.ts` projects those four relations without changing lyric token ownership or the one-line lyric layout.
+- UI consumes `eventInputLabel`, shows `LETTER + SPACE` for simultaneous input, and previews standalone Space with the star rail.
 
-- [ ] Write tests for before/between/after legacy Space folding, nearest-onset selection, no duplicated lyric dots, no independent Space event after migration, and `H + SPACE` rendering.
-- [ ] Run migration and LyricStage tests and confirm failure.
-- [ ] Implement immutable runtime migration and invoke it before two-hand arrangement.
-- [ ] Remove positional star-track rendering and related styling while keeping single-line lyrics and per-token letters/dots.
-- [ ] Re-run focused tests and confirm pass.
+- [x] Write tests for phrase-start, simultaneous, midpoint, and phrase-end Space generation, no duplicated lyric dots, and `H + SPACE` rendering.
+- [x] Implement sparse deterministic Space generation while preserving explicitly authored left-hand parts.
+- [x] Keep the positional star-track, single-line lyrics, per-token letters, and multi-note dots.
+- [x] Run focused arranger, cue, and LyricStage tests and confirm pass.
 
 ### Task 4: Deterministic piano gesture templates
 
@@ -168,4 +168,3 @@
 - [ ] Update authoring and current-logic documentation to A–Z / A–Z+Space / Shift and fixed gesture templates.
 - [ ] Run `npx tsc --noEmit`, `npm run lint`, `npm test -- --run`, `npm run build`, and `node --test tests/rendered-html.test.mjs`.
 - [ ] Inspect the local site in the in-app browser for lyric, H+SPACE, SHIFT, keyboard and pause/restart behavior.
-

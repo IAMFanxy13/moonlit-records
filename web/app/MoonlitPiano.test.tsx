@@ -21,9 +21,16 @@ describe("MoonlitPiano", () => {
         id: handleId++,
         voice: "warm" as const,
         notes: [...notes],
-        channelHandle: { release: vi.fn() },
+        channelHandle: {
+          release: vi.fn(),
+          scheduleRelease: vi.fn(),
+          cancelScheduledRelease: vi.fn(),
+        },
       })),
       keyUp: vi.fn(),
+      scheduleRelease: vi.fn(),
+      cancelScheduledRelease: vi.fn(),
+      runtimeInfo: vi.fn(() => ({ state: "running", baseLatency: 0.012, latencyHint: "interactive" })),
       releaseAll: vi.fn(),
       dispose: vi.fn(),
     };

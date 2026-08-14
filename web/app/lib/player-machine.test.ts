@@ -7,6 +7,7 @@ import {
   releaseKey,
   rewindPhrase,
   restartPlayer,
+  seekPlayerToPhrase,
   startPlayer,
   togglePause,
 } from "./player-machine";
@@ -147,6 +148,49 @@ describe("player machine", () => {
     expect(encore.sound?.kind).toBe("free");
     expect(encore.state).toBe(state);
     expect(finishRinging(state).status).toBe("complete");
+  });
+
+  it("seeks playing and completed states to a playable phrase start", () => {
+    const target = song.phrases[1];
+    const playing = {
+      ...startPlayer(createPlayerState(song)),
+      eventIndex: 1,
+      correctCount: 1,
+      activeHolds: { KeyN: { eventIndex: 0, code: "KeyN", startedAt: 1 } },
+    };
+    const complete = { ...playing, status: "complete" as const };
+    const ringing = { ...playing, status: "ringing" as const };
+
+    expect(seekPlayerToPhrase(playing, song, 1)).toMatchObject({
+      status: "playing",
+      eventIndex: target.startEvent,
+      correctCount: target.startEvent,
+      activeHolds: {},
+    });
+    expect(seekPlayerToPhrase(complete, song, 1).status).toBe("playing");
+    expect(seekPlayerToPhrase(ringing, song, 1).status).toBe("playing");
+  });
+
+  it("preserves paused intent when seeking and clamps an invalid line", () => {
+    const paused = togglePause(startPlayer(createPlayerState(song)));
+    const sought = seekPlayerToPhrase(paused, song, 99);
+
+    expect(sought.status).toBe("paused");
+    expect(sought.eventIndex).toBe(song.phrases.at(-1)?.startEvent);
+  });
+
+  it("starts an instrumental line at its first playable target", () => {
+    const instrumental = {
+      ...song,
+      phrases: [{ id: "instrumental", text: "", startEvent: 0, endEvent: 2 }],
+      events: [
+        { ...song.events[0], id: "marker", targetCode: "Escape", token: null },
+        { ...song.events[1], id: "shift", targetCode: "Shift", token: null },
+        { ...song.events[2], id: "shift-2", targetCode: "Shift", token: null },
+      ],
+    };
+
+    expect(seekPlayerToPhrase(startPlayer(createPlayerState(instrumental)), instrumental, 0).eventIndex).toBe(1);
   });
 
   it("emits a whole piano voicing from one correct physical key", () => {

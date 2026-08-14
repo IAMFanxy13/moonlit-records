@@ -19,6 +19,12 @@ export function scaleSongTempo(song: SongPackage, requestedTempo: number): SongP
     events: song.events.map((event) => ({
       ...event,
       notes: [...event.notes],
+      parts: event.parts?.map((part) => ({
+        ...part,
+        notes: [...part.notes],
+        velocities: part.velocities ? [...part.velocities] : undefined,
+        durationsMs: part.durationsMs?.map((duration) => Math.max(1, Math.round(duration * ratio))),
+      })),
       holdMs: scaleOptional(event.holdMs, ratio),
       restBeforeMs: scaleOptional(event.restBeforeMs, ratio),
       sourceStartMs: scaleOptional(event.sourceStartMs, ratio),
@@ -26,4 +32,3 @@ export function scaleSongTempo(song: SongPackage, requestedTempo: number): SongP
     })),
   };
 }
-

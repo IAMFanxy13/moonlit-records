@@ -18,15 +18,29 @@ describe("ScreenKeyboard", () => {
     expect(screen.queryByTestId("key-Escape")).not.toBeInTheDocument();
     expect(screen.getByTestId("key-Space")).toHaveAttribute("data-state", "idle");
     expect(screen.getByTestId("key-Space")).toHaveTextContent("SPACE");
-    expect(screen.getAllByRole("button")).toHaveLength(37);
-    expect(screen.getByText("Numbers, letters, and Space for lyric continuations.")).toBeInTheDocument();
-    expect(screen.getByText("A free piano, with lyric initials as your guide.")).toBeInTheDocument();
+    expect(screen.getAllByRole("button")).toHaveLength(28);
+    expect(screen.queryByTestId("key-Enter")).not.toBeInTheDocument();
+    expect(screen.getByTestId("key-Shift")).toHaveTextContent("SHIFT");
+    expect(screen.getByText("A–Z lyric melody · A–Z + Space two hands · Shift instrumental.")).toBeInTheDocument();
+    expect(screen.getByText("Right-hand lyrics, left-hand harmony — every note still waits for you.")).toBeInTheDocument();
   });
 
-  it("targets Space explicitly for a continuation note", () => {
+  it("targets Space explicitly for a left-hand gesture", () => {
     render(<ScreenKeyboard targetCode="Space" feedback={null} pressedCodes={new Set()} />);
 
     expect(screen.getByTestId("key-Space")).toHaveAttribute("data-state", "target");
-    expect(screen.getByTestId("key-Space")).toHaveAccessibleName("SPACE continuation key");
+    expect(screen.getByTestId("key-Space")).toHaveAccessibleName("SPACE · LEFT HAND, target");
+  });
+
+  it("can target both hands at the same time", () => {
+    render(<ScreenKeyboard targetCodes={["KeyA", "Space"]} feedback={null} pressedCodes={new Set()} />);
+    expect(screen.getByTestId("key-KeyA")).toHaveAttribute("data-state", "target");
+    expect(screen.getByTestId("key-Space")).toHaveAttribute("data-state", "target");
+  });
+
+  it("targets Shift as one standalone instrumental key", () => {
+    render(<ScreenKeyboard targetCode="Shift" feedback={null} pressedCodes={new Set()} />);
+    expect(screen.getByTestId("key-Shift")).toHaveAttribute("data-state", "target");
+    expect(screen.queryByTestId("key-Digit2")).not.toBeInTheDocument();
   });
 });

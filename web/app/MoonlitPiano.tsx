@@ -11,7 +11,7 @@ import { createIndexedDbPrivateLibrary, type PrivateLibrary } from "./import/pri
 import type { PrivateSongRecord } from "./import/types";
 import type { PlayerState } from "./lib/player-machine";
 import type { SongPackage } from "./lib/song";
-import { builtinSongs } from "./lib/songs";
+import { preparedBuiltinSongs } from "./lib/songs";
 
 type View = "search" | "loading" | "entrance" | "player" | "complete" | "error";
 
@@ -114,7 +114,7 @@ export function MoonlitPiano({ piano: injectedPiano, privateLibrary: injectedLib
   if (view === "search") {
     return (
       <SearchHome
-        songs={builtinSongs}
+        songs={preparedBuiltinSongs}
         privateRecords={privateRecords}
         libraryError={libraryError}
         onImported={rememberImportedSong}

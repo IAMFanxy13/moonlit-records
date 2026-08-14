@@ -1,9 +1,9 @@
 import type { CatalogSong } from "./song";
-import { builtinSongs } from "./songs";
+import { preparedBuiltinSongs } from "./songs";
 
 export function searchSongs(query: string): CatalogSong[] {
   const normalized = query.trim().toLocaleLowerCase();
-  return builtinSongs
+  return preparedBuiltinSongs
     .filter((song) => {
       if (!normalized) return true;
       return [song.title, song.artist, song.version, ...song.searchAliases]

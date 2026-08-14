@@ -28,4 +28,17 @@ describe("piano voice profiles", () => {
       expect(profile.tailMs).toBeGreaterThan(profile.damperRelease * 1000);
     }
   });
+
+  it("calibrates headroom, legato, and phrase release independently per instrument", () => {
+    const profiles = PIANO_VOICE_ORDER.map(getPianoVoiceProfile);
+    profiles.forEach((profile) => {
+      expect(profile.outputTrim).toBeGreaterThanOrEqual(0.65);
+      expect(profile.outputTrim).toBeLessThanOrEqual(0.85);
+      expect(profile.restRelease).toBeLessThan(profile.connectedRelease);
+      expect(profile.connectedRelease).toBeLessThan(profile.phraseRelease);
+      expect(profile.longNoteGraceMs).toBeLessThan(profile.phraseTailMs);
+    });
+    expect(new Set(profiles.map((profile) => profile.legato)).size).toBe(4);
+    expect(new Set(profiles.map((profile) => profile.outputTrim)).size).toBe(4);
+  });
 });

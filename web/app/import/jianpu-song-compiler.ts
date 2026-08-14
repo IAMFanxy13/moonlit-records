@@ -94,7 +94,7 @@ export function compileJianpuSong(score: ParsedJianpuScore, id: string): SongPac
         sourceStartMs: eventStartMs,
         sourceEndMs: eventStartMs + durationMs,
         confidence: parsedNote.confidence,
-        provenance: ["offline-jianpu-recognition"],
+        provenance: ["offline-jianpu-recognition", `key-${score.tonic}`],
       };
       events.push(event);
       pendingRestMs = 0;
@@ -115,6 +115,7 @@ export function compileJianpuSong(score: ParsedJianpuScore, id: string): SongPac
     throw new Error("A Jianpu score must contain at least one playable note.");
   }
 
+  const [beatsPerBar, beatUnit] = score.meter.split("/").map(Number);
   return {
     id,
     title: score.title,
@@ -124,9 +125,10 @@ export function compileJianpuSong(score: ParsedJianpuScore, id: string): SongPac
     lyricLanguage: score.rows.some((row) => HAN.test(row.lyricText)) ? "zh-CN" : "en",
     durationLabel: formatDuration(timelineMs),
     tempoBpm: score.tempoBpm,
+    meter: { beatsPerBar, beatUnit },
     recommendedPiano: score.quality === "clear" ? "concert" : "warm",
     quality: score.quality === "clear" ? "clear" : "sketch",
-    provenance: ["offline-jianpu-recognition", ...score.warnings],
+    provenance: ["offline-jianpu-recognition", `key-${score.tonic}`, ...score.warnings],
     phrases,
     events,
   };

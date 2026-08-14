@@ -29,10 +29,10 @@
 - Preserve `mapGestureValues<T>()` for authored arrays.
 - Add `mapGestureVelocities(plan, values)` for scale-aware velocity mapping.
 
-- [ ] Add failing tests: KeyA one-note -> octave pair; Shift one-note -> octave pair; Space one-note -> root/fifth/octave; explicit block -> one note; existing chords unchanged; secondary scales lower than 1.
-- [ ] Run `npm test -- --run app/lib/piano-gesture.test.ts` and confirm expected failures.
-- [ ] Implement minimal default expansion and bounded offsets/scales.
-- [ ] Re-run the focused test and confirm pass.
+- [x] Add failing tests: KeyA one-note -> octave pair; Shift one-note -> octave pair; Space one-note -> root/fifth/octave; explicit block -> one note; existing chords unchanged; secondary scales lower than 1.
+- [x] Run `npm test -- --run app/lib/piano-gesture.test.ts` and confirm expected failures.
+- [x] Implement minimal default expansion and bounded offsets/scales.
+- [x] Re-run the focused test and confirm pass.
 
 ### Task 2: Player integration
 
@@ -43,16 +43,16 @@
 **Interfaces:**
 - Consume `mapGestureVelocities(plan, velocity)` immediately before `piano.keyDown`.
 
-- [ ] Add failing integration tests proving one correct letter, standalone Space, and Shift each attack the enriched notes once while the score advances only once.
-- [ ] Run the focused player tests and confirm expected failures.
-- [ ] Wire velocity-scaled planned gestures into the existing audio call.
-- [ ] Re-run focused tests and confirm pass.
+- [x] Add failing integration tests proving one correct letter, standalone Space, and Shift each attack the enriched notes once while the score advances only once.
+- [x] Run the focused player tests and confirm expected failures.
+- [x] Wire velocity-scaled planned gestures into the existing audio call.
+- [x] Re-run focused tests and confirm pass.
 
 ### Task 3: Regression verification
 
 **Files:**
 - Modify: `CURRENT_LOGIC_ZH.md`
 
-- [ ] Document standalone guided richness and the free-piano exception.
-- [ ] Run `npx tsc --noEmit`, `npm run lint`, `npm test -- --run`, and `npm run build`.
-- [ ] Confirm simultaneous two-hand tests, cleanup tests, no-repeat tests, and cursor tests remain green.
+- [x] Document standalone guided richness and the free-piano exception.
+- [x] Run `npx tsc --noEmit`, `npm run lint`, `npm test -- --run`, and `npm run build`.
+- [x] Confirm simultaneous two-hand tests, cleanup tests, no-repeat tests, and cursor tests remain green.

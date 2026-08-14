@@ -15,7 +15,7 @@ const timedSong = {
       id: "timed-0",
       token: null,
       tokenIndex: null,
-      targetCode: "Digit1",
+      targetCode: "Shift",
       kind: "hold" as const,
       holdMs: 1_200,
       sourceStartMs: 0,
@@ -26,7 +26,8 @@ const timedSong = {
       id: "timed-1",
       token: null,
       tokenIndex: null,
-      targetCode: "Digit2",
+      targetCode: "Shift",
+      holdMs: 280,
       sourceStartMs: 800,
       sourceEndMs: 1_080,
     },
@@ -35,7 +36,8 @@ const timedSong = {
       id: "timed-2",
       token: null,
       tokenIndex: null,
-      targetCode: "Digit3",
+      targetCode: "Shift",
+      holdMs: 250,
       sourceStartMs: 1_600,
       sourceEndMs: 1_850,
     },
@@ -43,16 +45,16 @@ const timedSong = {
 };
 
 describe("RhythmGuide", () => {
-  it("shows ten numeric lanes and translates source duration into tap and hold blocks", () => {
+  it("shows the dedicated Shift lane and translates source duration into tap and hold blocks", () => {
     render(<RhythmGuide song={timedSong} eventIndex={0} />);
 
-    expect(screen.getByLabelText("Rhythm guide")).toHaveAttribute("data-lane-mode", "digits");
-    expect(screen.getAllByTestId(/rhythm-lane-/u)).toHaveLength(10);
-    expect(screen.getByText("GUIDE 1.2s · 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Rhythm guide")).toHaveAttribute("data-lane-mode", "hands");
+    expect(screen.getAllByTestId(/rhythm-lane-/u)).toHaveLength(1);
+    expect(screen.getByText("GUIDE 1.2s · SHIFT")).toBeInTheDocument();
     expect(screen.getByTestId("rhythm-event-0")).toHaveAttribute("data-duration-ms", "1200");
     expect(screen.getByTestId("rhythm-event-1")).toHaveAttribute("data-offset-ms", "800");
-    expect(screen.getByTestId("rhythm-event-1")).toHaveAccessibleName("Next key 2, suggested hold 0.3 seconds");
-    expect(screen.getByTestId("rhythm-event-1")).toHaveTextContent("2 0.3s");
+    expect(screen.getByTestId("rhythm-event-1")).toHaveAccessibleName("Next key SHIFT, suggested hold 0.3 seconds");
+    expect(screen.getByTestId("rhythm-event-1")).toHaveTextContent("SHIFT 0.3s");
   });
 
   it("names a continuation event as SPACE in the highway", () => {
@@ -68,8 +70,8 @@ describe("RhythmGuide", () => {
 
   it("shows an explicit duration for taps as well as holds", () => {
     render(<RhythmGuide song={timedSong} eventIndex={1} />);
-    expect(screen.getByText("GUIDE 0.3s · 2")).toBeInTheDocument();
-    expect(screen.getByText("Hold to drain the bar; release whenever you choose.")).toBeInTheDocument();
+    expect(screen.getByText("GUIDE 0.3s · SHIFT")).toBeInTheDocument();
+    expect(screen.getByText("The score shapes note length; your next keydown shapes the connection.")).toBeInTheDocument();
   });
 
   it("shows a silent countdown before exposing the next required key", () => {
@@ -91,13 +93,20 @@ describe("RhythmGuide", () => {
     expect(screen.getByTestId("rhythm-event-0")).not.toHaveAttribute("data-countdown");
     expect(screen.getByTestId("rhythm-event-0")).not.toHaveAttribute("data-active");
     expect(screen.getByTestId("rhythm-event-0")).toHaveAccessibleName(
-      "Current key 1, suggested hold 1.2 seconds",
+      "Current key SHIFT, suggested hold 1.2 seconds",
     );
   });
 
-  it("uses one shared lower bar that drains only for the active correct key", () => {
+  it("uses the same curated score target as the audio engine for a built-in tap", () => {
+    render(<RhythmGuide song={builtinSongs[0]} eventIndex={0} />);
+
+    expect(screen.getByTestId("rhythm-event-0")).toHaveAttribute("data-duration-ms", "683");
+    expect(screen.getByText("GUIDE 0.7s · N")).toBeInTheDocument();
+  });
+
+  it("uses one shared lower bar as musical-duration information, not a release command", () => {
     const { rerender } = render(
-      <SharedDurationBar event={timedSong.events[0]} active={false} resting={false} />,
+      <SharedDurationBar event={timedSong.events[0]} durationMs={1_200} active={false} resting={false} />,
     );
 
     const ready = screen.getByTestId("shared-duration-bar");
@@ -105,11 +114,16 @@ describe("RhythmGuide", () => {
     expect(ready).toHaveAttribute("data-event-id", "timed-0");
     expect(ready).toHaveTextContent("1");
     expect(ready).toHaveTextContent("1.2s");
+    expect(ready).toHaveTextContent("NEXT ATTACK WINDOW");
+    expect(ready).toHaveTextContent("NEXT GESTURE");
+    expect(ready).not.toHaveTextContent("PRESS TO START");
 
-    rerender(<SharedDurationBar event={timedSong.events[0]} active resting={false} />);
+    rerender(<SharedDurationBar event={timedSong.events[0]} durationMs={1_200} active resting={false} />);
     expect(screen.getByTestId("shared-duration-bar")).toHaveAttribute("data-countdown", "draining");
+    expect(screen.getByTestId("shared-duration-bar")).toHaveTextContent("LISTEN · THEN PLAY");
+    expect(screen.getByTestId("shared-duration-bar")).not.toHaveTextContent("HOLDING");
 
-    rerender(<SharedDurationBar event={timedSong.events[1]} active={false} resting={false} />);
+    rerender(<SharedDurationBar event={timedSong.events[1]} durationMs={280} active={false} resting={false} />);
     expect(screen.getByTestId("shared-duration-bar")).toHaveAttribute("data-countdown", "ready");
     expect(screen.getByTestId("shared-duration-bar")).toHaveAttribute("data-event-id", "timed-1");
   });

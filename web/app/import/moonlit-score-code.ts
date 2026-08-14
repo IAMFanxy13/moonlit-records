@@ -3,6 +3,7 @@ import { pinyin } from "pinyin-pro";
 import type { PianoVoice, SongEvent, SongPackage } from "../lib/song";
 import { normalizeSongPackage } from "../lib/song-normalizer";
 import type { PrivateSongRecord } from "./types";
+import { compileMoonlitScoreV2 } from "./moonlit-score-v2";
 
 const MAX_CODE_LENGTH = 300_000;
 const MAX_LINES = 1_000;
@@ -231,7 +232,7 @@ function parseSource(source: string): { headers: ScoreHeaders; phrases: CodePhra
   return { headers, phrases, normalised };
 }
 
-export function compileMoonlitScoreCode(
+function compileMoonlitScoreV1(
   source: string,
   options: CompileMoonlitScoreCodeOptions = {},
 ): PrivateSongRecord {
@@ -297,6 +298,7 @@ export function compileMoonlitScoreCode(
   if (events.length === 0) throw new MoonlitScoreCodeError("The score contains only rests; add at least one playable note.", 1);
   if (events.length > MAX_EVENTS) throw new MoonlitScoreCodeError(`A score may contain at most ${MAX_EVENTS} playable notes.`, 1);
   const language = hasChinese ? "zh-CN" : "en";
+  const [beatsPerBar, beatUnit] = headers.meter.split("/").map(Number);
   const song: SongPackage = normalizeSongPackage({
     id,
     title: headers.title,
@@ -306,6 +308,7 @@ export function compileMoonlitScoreCode(
     lyricLanguage: language,
     durationLabel: formatDuration(timelineMs),
     tempoBpm,
+    meter: { beatsPerBar, beatUnit },
     recommendedPiano: VOICES[headers.voice.toLowerCase()],
     quality: "clear",
     provenance: ["moonlit-score-code-v1", `key-${headers.key}`, `meter-${headers.meter}`],
@@ -322,4 +325,13 @@ export function compileMoonlitScoreCode(
     song,
     warnings: [],
   };
+}
+
+export function compileMoonlitScoreCode(
+  source: string,
+  options: CompileMoonlitScoreCodeOptions = {},
+): PrivateSongRecord {
+  return normalise(source).split("\n", 1)[0] === "MOONLIT-SCORE/2"
+    ? compileMoonlitScoreV2(source, options)
+    : compileMoonlitScoreV1(source, options);
 }

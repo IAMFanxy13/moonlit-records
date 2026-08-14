@@ -1,9 +1,9 @@
 import type { CSSProperties } from "react";
 
-import { labelForCode } from "../lib/keyboard";
+import { eventInputCodes, eventInputLabel, labelForCode, remainingEventInputLabel } from "../lib/keyboard";
+import { getScoreTargetDurationMs } from "../lib/piano-performance";
 import type { SongEvent, SongPackage } from "../lib/song";
 
-const DIGIT_LANES = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0"];
 const LETTER_LANES = Array.from({ length: 26 }, (_, index) => `Key${String.fromCharCode(65 + index)}`);
 const VISIBLE_EVENTS = 8;
 
@@ -11,6 +11,7 @@ interface RhythmGuideProps {
   song: SongPackage;
   eventIndex: number;
   restRemainingMs?: number;
+  completedCodes?: string[];
 }
 
 interface RhythmStyle extends CSSProperties {
@@ -22,14 +23,6 @@ interface RhythmStyle extends CSSProperties {
 
 interface SharedDurationStyle extends CSSProperties {
   "--rhythm-hold-ms": string;
-}
-
-function durationFor(event: SongEvent): number {
-  if (event.kind === "hold" && event.holdMs) return event.holdMs;
-  if (event.sourceStartMs !== undefined && event.sourceEndMs !== undefined) {
-    return Math.max(80, event.sourceEndMs - event.sourceStartMs);
-  }
-  return 240;
 }
 
 function offsetFor(current: SongEvent, event: SongEvent, ordinal: number): number {
@@ -45,13 +38,14 @@ function secondsLabel(durationMs: number): string {
 
 interface SharedDurationBarProps {
   event: SongEvent;
+  durationMs: number;
   active: boolean;
   resting: boolean;
+  positionLabel?: string;
 }
 
-export function SharedDurationBar({ event, active, resting }: SharedDurationBarProps) {
-  const durationMs = durationFor(event);
-  const label = labelForCode(event.targetCode);
+export function SharedDurationBar({ event, durationMs, active, resting, positionLabel }: SharedDurationBarProps) {
+  const label = eventInputLabel(event);
   const countdown = resting ? "resting" : active ? "draining" : "ready";
   const style: SharedDurationStyle = { "--rhythm-hold-ms": `${durationMs}ms` };
 
@@ -65,7 +59,7 @@ export function SharedDurationBar({ event, active, resting }: SharedDurationBarP
       style={style}
     >
       <div className="shared-duration-copy">
-        <span>DURATION GUIDE</span>
+        <span>{positionLabel ? `LEFT HAND · ${positionLabel}` : "NEXT ATTACK WINDOW"}</span>
         <strong>{resting ? "REST" : label}</strong>
       </div>
       <div className="shared-duration-track" aria-hidden="true">
@@ -73,21 +67,22 @@ export function SharedDurationBar({ event, active, resting }: SharedDurationBarP
       </div>
       <div className="shared-duration-time">
         <strong>{secondsLabel(durationMs)}s</strong>
-        <span>{resting ? "WAIT" : active ? "HOLDING" : "PRESS TO START"}</span>
+        <span>{resting ? "WAIT" : active ? "LISTEN · THEN PLAY" : "NEXT GESTURE"}</span>
       </div>
     </section>
   );
 }
 
-export function RhythmGuide({ song, eventIndex, restRemainingMs = 0 }: RhythmGuideProps) {
+export function RhythmGuide({ song, eventIndex, restRemainingMs = 0, completedCodes = [] }: RhythmGuideProps) {
   const current = song.events[eventIndex];
   if (!current) return null;
 
-  const digitMode = current.targetCode.startsWith("Digit");
-  const lanes = digitMode ? DIGIT_LANES : LETTER_LANES;
+  const currentCodes = eventInputCodes(current).filter((code) => !completedCodes.includes(code));
+  const handMode = currentCodes.some((code) => ["Space", "Shift"].includes(code));
+  const lanes = handMode ? currentCodes : LETTER_LANES;
   const visible = song.events.slice(eventIndex, eventIndex + VISIBLE_EVENTS);
-  const currentDuration = durationFor(current);
-  const currentLabel = labelForCode(current.targetCode);
+  const currentDuration = getScoreTargetDurationMs(song, eventIndex);
+  const currentLabel = remainingEventInputLabel(current, completedCodes);
   const resting = restRemainingMs > 0;
   const instruction = resting
     ? `REST ${secondsLabel(restRemainingMs)}s`
@@ -97,7 +92,7 @@ export function RhythmGuide({ song, eventIndex, restRemainingMs = 0 }: RhythmGui
     <section
       className="rhythm-guide"
       aria-label="Rhythm guide"
-      data-lane-mode={digitMode ? "digits" : "letters"}
+      data-lane-mode={handMode ? "hands" : "letters"}
       data-resting={resting}
     >
       <header className="rhythm-caption">
@@ -106,7 +101,7 @@ export function RhythmGuide({ song, eventIndex, restRemainingMs = 0 }: RhythmGui
         <small>
           {resting
             ? "No key is suggested until the rest completes."
-            : "Hold to drain the bar; release whenever you choose."}
+            : "The score shapes note length; your next keydown shapes the connection."}
         </small>
       </header>
       <div className="rhythm-track">
@@ -117,11 +112,14 @@ export function RhythmGuide({ song, eventIndex, restRemainingMs = 0 }: RhythmGui
         </div>
         <div className="rhythm-judgment" aria-hidden="true"><i /></div>
         {visible.map((event, ordinal) => {
-          const laneIndex = Math.max(0, lanes.indexOf(event.targetCode));
-          const durationMs = durationFor(event);
+          const laneIndex = Math.max(0, lanes.indexOf(eventInputCodes(event)[0]));
+          const absoluteIndex = eventIndex + ordinal;
+          const durationMs = getScoreTargetDurationMs(song, absoluteIndex);
           const offsetMs = offsetFor(current, event, ordinal);
           const isCurrent = ordinal === 0;
-          const label = labelForCode(event.targetCode);
+          const label = isCurrent
+            ? remainingEventInputLabel(event, completedCodes)
+            : eventInputLabel(event);
           const timing = `suggested hold ${secondsLabel(durationMs)} seconds`;
           const style: RhythmStyle = {
             "--rhythm-left": `${((laneIndex + 0.5) / lanes.length) * 100}%`,
@@ -134,7 +132,7 @@ export function RhythmGuide({ song, eventIndex, restRemainingMs = 0 }: RhythmGui
               key={event.id}
               className="rhythm-note"
               style={style}
-              data-testid={`rhythm-event-${eventIndex + ordinal}`}
+              data-testid={`rhythm-event-${absoluteIndex}`}
               data-current={isCurrent}
               data-kind={event.kind}
               data-duration-ms={durationMs}
